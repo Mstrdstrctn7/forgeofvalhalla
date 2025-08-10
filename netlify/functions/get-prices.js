@@ -1,7 +1,6 @@
 // netlify/functions/get-prices.js
 // Resilient live prices with fallback + strict no-cache.
-// Primary: CoinGecko. Fallback: Binance (USDT≈USD).
-// Guidance aligned with web.dev fetch timeouts & Netlify function headers.
+// Primary: CoinGecko. Fallback: Binance (USDT≈USD). Short timeouts.
 
 const CG_URL =
   "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd";
@@ -21,11 +20,7 @@ async function fetchCoinGecko() {
   try {
     const res = await fetch(CG_URL, {
       signal: t.signal,
-      headers: {
-        accept: "application/json",
-        "cache-control": "no-cache",
-        "user-agent": "ForgeOfValhalla/1.0"
-      }
+      headers: { accept: "application/json", "cache-control": "no-cache" }
     });
     t.cancel();
     if (!res.ok) throw new Error(`CG ${res.status}`);
@@ -74,15 +69,10 @@ export async function handler() {
         fallback: String(e2),
         t: Date.now()
       };
-      return {
-        statusCode: 502,
-        headers: nocacheHeaders(),
-        body: JSON.stringify(payload)
-      };
+      return { statusCode: 502, headers: nocacheHeaders(), body: JSON.stringify(payload) };
     }
   }
 
-  // Final payload
   const payload = {
     BTC: isFinite(out.BTC) ? out.BTC : null,
     ETH: isFinite(out.ETH) ? out.ETH : null,
@@ -90,22 +80,16 @@ export async function handler() {
     t: Date.now()
   };
 
-  return {
-    statusCode: 200,
-    headers: nocacheHeaders(),
-    body: JSON.stringify(payload)
-  };
+  return { statusCode: 200, headers: nocacheHeaders(), body: JSON.stringify(payload) };
 }
 
 function nocacheHeaders() {
   return {
     "content-type": "application/json",
-    // Strong no-cache everywhere (browser, CDN, proxies)
     "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-    pragma: "no-cache",
-    expires: "0",
-    // CORS relaxed to keep things simple in dev
+    "pragma": "no-cache",
+    "expires": "0",
     "access-control-allow-origin": "*",
-    vary: "Origin"
+    "vary": "Origin"
   };
 }
