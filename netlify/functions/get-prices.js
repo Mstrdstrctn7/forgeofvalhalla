@@ -1,126 +1,140 @@
-// netlify/functions/get-prices.js
-// Multi-feed live prices with outlier filter + strict no-cache.
-// Sources: CoinGecko, Binance (USDT), Bitstamp (USD). Short timeouts.
+/**
+ * get-prices.js
+ * Resilient live prices with strict no-cache + per-feed meta breakdown.
+ * Primary: CoinGecko. Fallbacks: Binance (USDT), Bitstamp (USD).
+ */
 
 const NOCACHE = {
-  'content-type': 'application/json',
-  'cache-control': 'no-store, no-cache, must-revalidate, max-age=0',
-  'pragma': 'no-cache',
-  'vary': 'Origin',
-  'access-control-allow-origin': '*',
+  "access-control-allow-origin": "*",
+  "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+  "vary": "Origin",
+  // keep simple CORS in dev
 };
 
-function t(ms) { return new Promise(r => setTimeout(r, ms)); }
+/** tiny helpers **/
+const clampPct = (v, center, pct) => {
+  const hi = center * (1 + pct);
+  const lo = center * (1 - pct);
+  return Math.min(Math.max(v, lo), hi);
+};
 
-async function withTimeout(url, opts = {}, ms = 2500) {
-  const c = new AbortController();
-  const id = setTimeout(() => c.abort(), ms);
+const median = (arr) => {
+  const a = arr.slice().sort((x, y) => x - y);
+  const n = a.length;
+  return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
+};
+
+const filterOutliers = (arr, frac = 0.01) => {
+  if (arr.length === 0) return arr;
+  const m = median(arr);
+  const d = arr.map((v) => Math.abs(v - m)).sort((a, b) => a - b);
+  const idx = Math.floor((1 - frac) * (d.length - 1));
+  const thr = d[idx] ?? 0;
+  return arr.filter((v) => Math.abs(v - m) <= thr);
+};
+
+async function withTimeout(fetchPromise, ms = 1500) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await fetch(url, { ...opts, signal: c.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } finally {
+    const res = await fetchPromise(ctrl.signal);
     clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
   }
 }
 
-// ---- Feed fetchers ----
-async function fromCoinGecko() {
+/** feeds **/
+async function fCoinGecko(signal) {
   const url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd";
-  const j = await withTimeout(url, {
+  const res = await fetch(url, {
+    signal,
     headers: {
       accept: "application/json",
+      "cache-control": "no-cache",
       "user-agent": "ForgeOfValhalla/1.0",
-    }
-  }, 2500);
-  return {
-    src: "coingecko",
-    BTC: Number(j?.bitcoin?.usd ?? NaN),
-    ETH: Number(j?.ethereum?.usd ?? NaN),
-  };
+    },
+  });
+  if (!res.ok) throw new Error(`coingecko ${res.status}`);
+  const j = await res.json();
+  const BTC = Number(j?.bitcoin?.usd);
+  const ETH = Number(j?.ethereum?.usd);
+  return { src: "CoinGecko", BTC: isFinite(BTC) ? BTC : null, ETH: isFinite(ETH) ? ETH : null };
 }
 
-async function fromBinance() {
-  // Two lightweight calls (keeps it simple and reliable)
-  const [b, e] = await Promise.all([
-    withTimeout("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", {}, 2000),
-    withTimeout("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", {}, 2000),
+async function fBinance(signal) {
+  // USDT proxy for USD
+  const url = "https://api.binance.com/api/v3/ticker/price?symbols=%5B%22BTCUSDT%22,%22ETHUSDT%22%5D";
+  const res = await fetch(url, { signal, headers: { accept: "application/json", "cache-control": "no-cache" }});
+  if (!res.ok) throw new Error(`binance ${res.status}`);
+  const arr = await res.json();
+  const map = Object.fromEntries(arr.map((r) => [r.symbol, Number(r.price)]));
+  const BTC = Number(map.BTCUSDT);
+  const ETH = Number(map.ETHUSDT);
+  return { src: "Binance", BTC: isFinite(BTC) ? BTC : null, ETH: isFinite(ETH) ? ETH : null };
+}
+
+async function fBitstamp(signal) {
+  // USD pairs
+  const [bRes, eRes] = await Promise.all([
+    fetch("https://www.bitstamp.net/api/v2/ticker/btcusd", { signal }),
+    fetch("https://www.bitstamp.net/api/v2/ticker/ethusd", { signal }),
   ]);
-  return {
-    src: "binance",
-    BTC: Number(b?.price ?? NaN),
-    ETH: Number(e?.price ?? NaN),
-  };
-}
-
-async function fromBitstamp() {
-  const [b, e] = await Promise.all([
-    withTimeout("https://www.bitstamp.net/api/v2/ticker/btcusd/", {}, 2000),
-    withTimeout("https://www.bitstamp.net/api/v2/ticker/ethusd/", {}, 2000),
-  ]);
-  return {
-    src: "bitstamp",
-    BTC: Number(b?.last ?? NaN),
-    ETH: Number(e?.last ?? NaN),
-  };
-}
-
-// ---- Merge helpers ----
-function median(arr) {
-  const a = [...arr].sort((x,y)=>x-y);
-  const n = a.length;
-  if (!n) return NaN;
-  return n % 2 ? a[(n-1)/2] : (a[n/2 - 1] + a[n/2]) / 2;
-}
-
-function filterOutliers(values, tolerance = 0.01) { // 1% default
-  if (values.length < 2) return values;
-  const m = median(values);
-  return values.filter(v => Math.abs(v - m) / m <= tolerance);
+  if (!bRes.ok || !eRes.ok) throw new Error(`bitstamp ${bRes.status}/${eRes.status}`);
+  const [bj, ej] = await Promise.all([bRes.json(), eRes.json()]);
+  const BTC = Number(bj?.last);
+  const ETH = Number(ej?.last);
+  return { src: "Bitstamp", BTC: isFinite(BTC) ? BTC : null, ETH: isFinite(ETH) ? ETH : null };
 }
 
 export async function handler() {
   const tsStart = Date.now();
 
-  // Fire all feeds; tolerate individual failures.
+  // collect feeds with short timeouts, tolerate failures
   const results = await Promise.allSettled([
-    fromCoinGecko(),
-    fromBinance(),
-    fromBitstamp(),
+    withTimeout((signal) => fCoinGecko(signal), 1500),
+    withTimeout((signal) => fBinance(signal), 1200),
+    withTimeout((signal) => fBitstamp(signal), 1500),
   ]);
 
-  const metas = [];
-  for (const r of results) if (r.status === "fulfilled") metas.push(r.value);
+  const metas = results
+    .filter((r) => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((m) => m && (isFinite(m.BTC ?? NaN) || isFinite(m.ETH ?? NaN)));
 
-  const btcCandidates = metas.map(m => m.BTC).filter(n => Number.isFinite(n) && n > 0);
-  const ethCandidates = metas.map(m => m.ETH).filter(n => Number.isFinite(n) && n > 0);
+  // Need at least 1 quote; ideally 2+
+  const btcCandidates = metas.map((m) => m.BTC).filter((v) => isFinite(v));
+  const ethCandidates = metas.map((m) => m.ETH).filter((v) => isFinite(v));
 
-  const btcFiltered = filterOutliers(btcCandidates, 0.01); // 1% outlier clamp
-  const ethFiltered = filterOutliers(ethCandidates, 0.01);
-
-  const BTC = median(btcFiltered);
-  const ETH = median(ethFiltered);
-
-  if (!Number.isFinite(BTC) || !Number.isFinite(ETH)) {
-    return {
-      statusCode: 502,
-      headers: NOCACHE,
-      body: JSON.stringify({ error: "upstream_error", status: 502 })
-    };
+  if (btcCandidates.length === 0 && ethCandidates.length === 0) {
+    return { statusCode: 502, headers: NOCACHE, body: JSON.stringify({ error: "upstream_error", status: 502 }) };
   }
 
+  // Remove top/bottom 1% outliers then median
+  const btcFiltered = btcCandidates.length ? filterOutliers(btcCandidates, 0.01) : [];
+  const ethFiltered = ethCandidates.length ? filterOutliers(ethCandidates, 0.01) : [];
+  let BTC = btcFiltered.length ? median(btcFiltered) : null;
+  let ETH = ethFiltered.length ? median(ethFiltered) : null;
+
+  // Gentle 0.2% clamp around the strongest source (CoinGecko if present)
+  const clampBaseBTC = metas.find((m) => m.src === "CoinGecko")?.BTC ?? BTC;
+  const clampBaseETH = metas.find((m) => m.src === "CoinGecko")?.ETH ?? ETH;
+  if (isFinite(BTC) && isFinite(clampBaseBTC)) BTC = clampPct(BTC, clampBaseBTC, 0.002);
+  if (isFinite(ETH) && isFinite(clampBaseETH)) ETH = clampPct(ETH, clampBaseETH, 0.002);
+
+  // Final payload — ALWAYS include meta
   const payload = {
-    BTC: Number(BTC.toFixed(2)),
-    ETH: Number(ETH.toFixed(2)),
+    BTC: isFinite(BTC) ? Number(BTC.toFixed(2)) : null,
+    ETH: isFinite(ETH) ? Number(ETH.toFixed(2)) : null,
     ts: Date.now(),
-    meta: {
-      feeds: metas.map(m => ({
-        src: m.src,
-        BTC: Number.isFinite(m.BTC) ? Number(m.BTC) : null,
-        ETH: Number.isFinite(m.ETH) ? Number(m.ETH) : null,
-      })),
-      elapsed_ms: Date.now() - tsStart
-    }
+    meta: metas.map((m) => ({
+      src: m.src,
+      BTC: isFinite(m.BTC) ? Number(m.BTC) : null,
+      ETH: isFinite(m.ETH) ? Number(m.ETH) : null,
+    })),
+    elapsed_ms: Date.now() - tsStart,
   };
 
   return { statusCode: 200, headers: NOCACHE, body: JSON.stringify(payload) };
