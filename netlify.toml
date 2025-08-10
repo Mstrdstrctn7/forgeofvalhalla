@@ -3,8 +3,14 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# Optional: redirect SPA routes to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[edge_functions]
+  deno_version = "1.45.5"
+
+[[edge_functions]]
+  path = "/.netlify/functions/get-prices"
+  function = "get-prices"
