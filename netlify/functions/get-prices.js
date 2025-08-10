@@ -1,34 +1,63 @@
 // netlify/functions/get-prices.js
-export async function handler() {
-  try {
-    const r = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
-    );
-    if (!r.ok) throw new Error(`Upstream error ${r.status}`);
-    const j = await r.json();
+// Fast BTC/ETH prices with no caching + short timeout
 
-    const data = {
-      BTC: j?.bitcoin?.usd,
-      ETH: j?.ethereum?.usd,
+const COINGECKO_URL =
+  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd";
+
+exports.handler = async () => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000); // 3s safety timeout
+
+  try {
+    const res = await fetch(COINGECKO_URL, {
+      signal: controller.signal,
+      headers: {
+        accept: "application/json",
+        "user-agent": "ForgeOfValhalla/1.0 (+https://forgeofvalhalla.netlify.app)"
+      },
+      cache: "no-store"
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      return {
+        statusCode: res.status,
+        headers: {
+          "content-type": "application/json",
+          "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+          "access-control-allow-origin": "*"
+        },
+        body: JSON.stringify({ error: "upstream_error", status: res.status })
+      };
+    }
+
+    const data = await res.json();
+    const out = {
+      BTC: Number(data?.bitcoin?.usd ?? 0),
+      ETH: Number(data?.ethereum?.usd ?? 0),
+      ts: Date.now()
     };
 
     return {
       statusCode: 200,
       headers: {
         "content-type": "application/json",
-        // Kill all caching everywhere
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        "Pragma": "no-cache",
-        "Surrogate-Control": "no-store",
-        "Netlify-CDN-Cache-Control": "no-store",
+        "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+        "access-control-allow-origin": "*",
+        vary: "Origin"
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(out)
     };
   } catch (err) {
     return {
-      statusCode: 500,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ error: err.message }),
+      statusCode: 200,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+        "access-control-allow-origin": "*"
+      },
+      body: JSON.stringify({ BTC: 0, ETH: 0, ts: Date.now(), error: "timeout_or_fetch_error" })
     };
   }
-}
+};

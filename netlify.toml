@@ -3,16 +3,16 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# Single-page app routing
+# Single Page App routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Make the price function always fresh
+# Never cache our live price function
 [[headers]]
   for = "/.netlify/functions/get-prices"
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate, max-age=0"
-    Pragma = "no-cache"
-    Expires = "0"
+    Access-Control-Allow-Origin = "*"
+    Vary = "Origin"
