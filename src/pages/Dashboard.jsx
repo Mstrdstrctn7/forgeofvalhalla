@@ -1,63 +1,70 @@
+// src/pages/Dashboard.jsx
 import { useEffect, useState } from "react";
-import { useSession } from "../hooks/useSession";
+import useSession from "../hooks/useSession"; // ← default import
+// (No need to import supabase here)
 
 export default function Dashboard() {
   const { session } = useSession();
+
   const [prices, setPrices] = useState({});
-  const [err, setErr] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const REFRESH_MS = 3000; // 3 seconds
+
+  async function fetchPrices() {
+    try {
+      const res = await fetch("/.netlify/functions/get-prices", {
+        // make sure the browser doesn’t cache the response
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      const data = await res.json();
+      setPrices(data || {});
+      setLastUpdated(new Date());
+    } catch (e) {
+      console.error("price fetch failed:", e);
+    }
+  }
 
   useEffect(() => {
-    let alive = true;
-    const fetchPrices = async () => {
-      try {
-        // add a timestamp to bust any caches and request with no-store
-        const res = await fetch(
-          `/.netlify/functions/get-prices?t=${Date.now()}`,
-          { cache: "no-store" }
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (alive) {
-          setPrices(data);
-          setErr(null);
-        }
-      } catch (e) {
-        if (alive) setErr(e.message || String(e));
-      }
-    };
-
-    // initial + poll every 3s
-    fetchPrices();
-    const id = setInterval(fetchPrices, 3000);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
+    fetchPrices(); // initial
+    const id = setInterval(fetchPrices, REFRESH_MS);
+    return () => clearInterval(id);
   }, []);
 
   return (
-    <div style={{ padding: 24, color: "#fff" }}>
-      <h1>Dashboard</h1>
-      <p>Welcome, {session?.user?.email}!</p>
+    <div style={{ color: "#fff", padding: 24 }}>
+      <h2>Dashboard</h2>
+      <p>
+        Welcome, <b>{session?.user?.email}</b>!
+      </p>
+      <p>This page is protected. If you sign out, you’ll be redirected to Login.</p>
 
-      <h3 style={{ marginTop: 24 }}>Live Prices</h3>
-      {err && <p style={{ color: "tomato" }}>Error: {err}</p>}
-
-      <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-        <div style={{ padding: 12, background: "#222", borderRadius: 8 }}>
-          <div>BTC</div>
-          <div style={{ fontSize: 24 }}>
-            {prices.BTC != null ? `$${prices.BTC}` : "…"}
-          </div>
-        </div>
-        <div style={{ padding: 12, background: "#222", borderRadius: 8 }}>
-          <div>ETH</div>
-          <div style={{ fontSize: 24 }}>
-            {prices.ETH != null ? `$${prices.ETH}` : "…"}
-          </div>
-        </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 24, flexWrap: "wrap" }}>
+        <Card title="BTC (USD)" value={prices.BTC} />
+        <Card title="ETH (USD)" value={prices.ETH} />
       </div>
-      <p style={{ opacity: 0.6, marginTop: 8 }}>Refresh: every ~3 seconds</p>
+
+      <p style={{ opacity: 0.7, marginTop: 12 }}>
+        {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : "Loading prices…"}
+      </p>
+    </div>
+  );
+}
+
+function Card({ title, value }) {
+  return (
+    <div style={{
+      background: "#1f1f1f",
+      borderRadius: 12,
+      padding: 16,
+      minWidth: 160,
+      textAlign: "center",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+    }}>
+      <div style={{ fontSize: 12, opacity: 0.8 }}>{title}</div>
+      <div style={{ fontSize: 24, marginTop: 6 }}>
+        {value !== undefined ? `$${Number(value).toLocaleString()}` : "—"}
+      </div>
     </div>
   );
 }
