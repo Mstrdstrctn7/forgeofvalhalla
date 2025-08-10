@@ -15,7 +15,7 @@ export default function Dashboard() {
     };
 
     fetchPrices(); // first call immediately
-    const interval = setInterval(fetchPrices, 1500); // every 1.5s
+    const interval = setInterval(fetchPrices, 3000); // every 3 seconds
 
     return () => clearInterval(interval);
   }, []);
