@@ -1,106 +1,84 @@
-// src/pages/Dashboard.jsx
-import { useEffect, useRef, useState } from "react";
-import useSession from "../hooks/useSession";              // default import ✅
-import PricesPanel from "../components/PricesPanel";        // the panel we added
+import { useEffect, useState, lazy, Suspense } from "react";
+import useSession from "../hooks/useSession";
 
-const FN_URL = "/.netlify/functions/get-prices";
+const PricesPanel = lazy(() => import("../components/PricesPanel"));
 
-// Small hook to poll the Netlify function every `pollMs` ms
-function usePrices(pollMs = 3000) {
-  const [prices, setPrices] = useState({});
-  const [updatedAt, setUpdatedAt] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const timer = useRef(null);
-  const abortRef = useRef(null);
-
-  const fetchOnce = async () => {
-    try {
-      setError("");
-      abortRef.current?.abort();
-      const ac = new AbortController();
-      abortRef.current = ac;
-
-      const res = await fetch(FN_URL, {
-        signal: ac.signal,
-        // make sure we never get a cached response
-        headers: {
-          "cache-control": "no-cache",
-          pragma: "no-cache",
-        },
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setPrices(data);
-      setUpdatedAt(new Date());
-    } catch (e) {
-      if (e.name !== "AbortError") {
-        setError(String(e.message || e));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // first hit immediately
-    fetchOnce();
-
-    // then poll
-    timer.current = setInterval(fetchOnce, pollMs);
-
-    // optional: pause when tab/app is hidden to save calls
-    const onVis = () => {
-      if (document.visibilityState === "hidden") {
-        clearInterval(timer.current);
-      } else {
-        fetchOnce();
-        timer.current = setInterval(fetchOnce, pollMs);
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-
-    return () => {
-      clearInterval(timer.current);
-      document.removeEventListener("visibilitychange", onVis);
-      abortRef.current?.abort();
-    };
-  }, [pollMs]);
-
-  return { prices, updatedAt, loading, error };
-}
+const POLL_MS = 3000; // main=3s, fast-poll branch can change to 1500
 
 export default function Dashboard() {
-  const { session } = useSession(); // will be null if signed out
-  const { prices, updatedAt, loading, error } = usePrices(1500);
+  const { session } = useSession();
+  const [prices, setPrices] = useState({});
+  const [lastAt, setLastAt] = useState(null);
+
+  useEffect(() => {
+    let timer = null;
+    let alive = true;
+
+    const hit = async () => {
+      try {
+        const res = await fetch("/.netlify/functions/get-prices", {
+          headers: { "cache-control": "no-cache" }
+        });
+        const data = await res.json();
+        if (!alive) return;
+        setPrices({ BTC: data.BTC, ETH: data.ETH, source: data.source });
+        setLastAt(new Date());
+      } catch {
+        // swallow; next tick will retry
+      }
+    };
+
+    hit(); // immediate
+    timer = setInterval(hit, POLL_MS);
+
+    return () => {
+      alive = false;
+      if (timer) clearInterval(timer);
+    };
+  }, []);
+
+  if (!session) {
+    return <div style={{ color: "#fff", padding: 24 }}>Redirecting to login…</div>;
+  }
+
+  const variant = import.meta.env.VITE_VARIANT ?? "unknown";
+  const freshnessMs = lastAt ? Date.now() - lastAt.getTime() : Infinity;
+  const fresh = freshnessMs < 4000; // 4s threshold
+  const dotStyle = {
+    display: "inline-block",
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    background: fresh ? "#2ecc71" : "#f1c40f",
+    boxShadow: "0 0 8px rgba(0,0,0,.35)",
+    marginRight: 8,
+    verticalAlign: "middle"
+  };
 
   return (
-    <div style={{ padding: 24, color: "#fff" }}>
+    <div style={{ color: "#fff", padding: 24 }}>
       <h1>Dashboard</h1>
-
-      <p>
-        Welcome, <b>{session?.user?.email ?? "guest"}</b>!
-      </p>
-      <p>
-        This page is protected. If you sign out, you’ll be redirected to Login.
+      <p style={{ opacity: 0.7, marginTop: -8 }}>
+        Variant: <b>{variant}</b>
       </p>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: 16,
-          marginTop: 24,
-        }}
-      >
-        <PricesPanel symbol="BTC" price={prices.BTC} loading={loading} error={error} />
-        <PricesPanel symbol="ETH" price={prices.ETH} loading={loading} error={error} />
+      <p style={{ marginTop: 16 }}>
+        Welcome, <b>{session.user?.email}</b>!
+      </p>
+
+      <div style={{ marginTop: 8 }}>
+        <span style={dotStyle} aria-label={fresh ? "fresh" : "stale"} />
+        <span style={{ opacity: 0.8 }}>
+          Last updated: {lastAt ? lastAt.toLocaleTimeString() : "—"}
+          {prices?.source ? ` • source: ${prices.source}` : ""}
+        </span>
       </div>
 
-      <p style={{ opacity: 0.8, marginTop: 16 }}>
-        Last updated: {updatedAt ? updatedAt.toLocaleTimeString() : "—"}
-      </p>
+      <div style={{ marginTop: 24 }}>
+        <Suspense fallback={<div style={{ opacity: 0.6 }}>Loading prices…</div>}>
+          <PricesPanel prices={prices} />
+        </Suspense>
+      </div>
     </div>
   );
 }
