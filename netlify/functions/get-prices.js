@@ -1,34 +1,34 @@
-/**
- * Simple BTC/ETH price fetcher via CoinGecko.
- * Your dashboard polls this every 3s.
- * We add short cache headers so Netlify/CDN can help a bit.
- */
+// netlify/functions/get-prices.js
 export async function handler() {
   try {
-    const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd';
-    const res = await fetch(url, { headers: { accept: 'application/json' } });
-    if (!res.ok) throw new Error(`coingecko: ${res.status} ${res.statusText}`);
+    const r = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
+    );
+    if (!r.ok) throw new Error(`Upstream error ${r.status}`);
+    const j = await r.json();
 
-    const json = await res.json();
-    const out = {
-      BTC: json?.bitcoin?.usd ?? null,
-      ETH: json?.ethereum?.usd ?? null,
+    const data = {
+      BTC: j?.bitcoin?.usd,
+      ETH: j?.ethereum?.usd,
     };
 
     return {
       statusCode: 200,
       headers: {
-        'content-type': 'application/json',
-        // small cache to smooth bursts; still feels live
-        'cache-control': 'public, max-age=5',
+        "content-type": "application/json",
+        // Kill all caching everywhere
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Surrogate-Control": "no-store",
+        "Netlify-CDN-Cache-Control": "no-store",
       },
-      body: JSON.stringify(out),
+      body: JSON.stringify(data),
     };
   } catch (err) {
     return {
       statusCode: 500,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ error: err.message || String(err) }),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ error: err.message }),
     };
   }
 }
