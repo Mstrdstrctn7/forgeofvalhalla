@@ -1,184 +1,136 @@
-/**
- * PricesStream — ultra-responsive 3-source WebSocket feed with tiny-move sensitivity.
- * Sources: Binance (USDT), Kraken (USD), Bitstamp (USD).
- * Strategy: median-of-3, outlier clamp at 0.2% from median.
- * Rendering: batches setState in requestAnimationFrame to avoid jank.
- */
 import { useEffect, useRef, useState } from "react";
 
-const TOLERANCE = 0.002; // 0.2% from median
-const SHOW_DECIMALS = { BTC: 2, ETH: 2 }; // show cents so tiny moves appear
-
-function fmt(sym, x) {
-  if (x == null) return "—";
-  return Number(x).toLocaleString(undefined, {
-    minimumFractionDigits: SHOW_DECIMALS[sym] ?? 2,
-    maximumFractionDigits: SHOW_DECIMALS[sym] ?? 2,
-  });
-}
-
+/**
+ * PricesStream
+ * - Polls /.netlify/functions/get-prices
+ * - Adaptive polling: base 3000ms; 1500ms when ≥2 feeds OK & no errors; 5000ms on trouble
+ * - Renders a tiny meta badge with feed status + elapsed_ms
+ */
 export default function PricesStream() {
-  const [prices, setPrices] = useState({ BTC: null, ETH: null, src: "—", ts: 0 });
-  const latestRef = useRef({ BTC: null, ETH: null, src: "—", ts: 0 });
-  const rafRef = useRef(0);
+  const [data, setData] = useState(null);
+  const [nextMs, setNextMs] = useState(3000);
+  const timerRef = useRef(null);
+  const mountedRef = useRef(true);
 
   // helpers
-  const commit = () => {
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      setPrices({ ...latestRef.current });
-    });
+  const safeNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const feeds = data?.meta?.feeds ?? [];
+  const okFeeds = feeds.filter(f => safeNum(f.BTC) || safeNum(f.ETH)).length;
+  const errFeeds = feeds.filter(f => !!f.err).length;
+
+  const decideNextDelay = (payload) => {
+    // Defaults
+    let ms = 3000;
+
+    const meta = payload?.meta || {};
+    const feedsArr = meta.feeds || [];
+    const ok = feedsArr.filter(f => safeNum(f.BTC) || safeNum(f.ETH)).length;
+    const errs = feedsArr.filter(f => !!f.err).length;
+
+    // If we have at least 2 healthy feeds and zero errors, tighten to 1.5s
+    if (ok >= 2 && errs === 0) ms = 1500;
+
+    // If we have many errors or zero healthy feeds, back off
+    if (ok === 0 || errs >= 2) ms = 5000;
+
+    return ms;
   };
 
-  const accept = (next) => {
-    latestRef.current = next;
-    commit();
+  const schedule = (ms) => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(fetchOnce, ms);
+    setNextMs(ms);
+  };
+
+  const fetchOnce = async () => {
+    try {
+      const res = await fetch("/.netlify/functions/get-prices", {
+        cache: "no-store",
+        headers: { "pragma": "no-cache", "cache-control": "no-cache" },
+      });
+      const json = await res.json();
+      if (!mountedRef.current) return;
+      setData(json);
+      schedule(decideNextDelay(json));
+    } catch (_e) {
+      // Network error -> back off a bit
+      if (!mountedRef.current) return;
+      schedule(5000);
+    }
   };
 
   useEffect(() => {
-    let closed = false;
-
-    // Per-source normalizers -> { BTC, ETH, src, ts }
-    // 1) Binance (USDT ~ USD), stream miniTicker
-    const wsBinance = new WebSocket("wss://stream.binance.com:9443/ws/!miniTicker@arr");
-    wsBinance.onmessage = (ev) => {
-      if (closed) return;
-      try {
-        const arr = JSON.parse(ev.data);
-        // find BTCUSDT & ETHUSDT
-        let btc, eth;
-        for (const t of arr) {
-          if (t.s === "BTCUSDT") btc = parseFloat(t.c);
-          if (t.s === "ETHUSDT") eth = parseFloat(t.c);
-        }
-        if (btc || eth) mergeTick({ BTC: btc, ETH: eth, src: "binance", ts: Date.now() });
-      } catch {}
-    };
-
-    // 2) Kraken (USD)
-    const wsKraken = new WebSocket("wss://ws.kraken.com/");
-    wsKraken.onopen = () => {
-      wsKraken.send(JSON.stringify({
-        event: "subscribe",
-        pair: ["XBT/USD", "ETH/USD"],
-        subscription: { name: "ticker" }
-      }));
-    };
-    wsKraken.onmessage = (ev) => {
-      if (closed) return;
-      try {
-        const msg = JSON.parse(ev.data);
-        if (!Array.isArray(msg) || !msg[1] || !msg[1].c) return;
-        const pair = msg[3]; // "XBT/USD" or "ETH/USD"
-        const last = parseFloat(msg[1].c[0]);
-        if (!isFinite(last)) return;
-        if (pair === "XBT/USD") mergeTick({ BTC: last, src: "kraken", ts: Date.now() });
-        if (pair === "ETH/USD") mergeTick({ ETH: last, src: "kraken", ts: Date.now() });
-      } catch {}
-    };
-
-    // 3) Bitstamp (USD) — ticker channels
-    const wsBitstamp = new WebSocket("wss://ws.bitstamp.net");
-    wsBitstamp.onopen = () => {
-      wsBitstamp.send(JSON.stringify({ event: "bts:subscribe", data: { channel: "ticker_btcusd" } }));
-      wsBitstamp.send(JSON.stringify({ event: "bts:subscribe", data: { channel: "ticker_ethusd" } }));
-    };
-    wsBitstamp.onmessage = (ev) => {
-      if (closed) return;
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg.event !== "ticker") return;
-        const p = parseFloat(msg.data?.last);
-        if (!isFinite(p)) return;
-        if (msg.channel === "ticker_btcusd") mergeTick({ BTC: p, src: "bitstamp", ts: Date.now() });
-        if (msg.channel === "ticker_ethusd") mergeTick({ ETH: p, src: "bitstamp", ts: Date.now() });
-      } catch {}
-    };
-
-    // aggregator state: keep latest from each source
-    const lastBySrc = {
-      binance: { BTC: null, ETH: null },
-      kraken: { BTC: null, ETH: null },
-      bitstamp: { BTC: null, ETH: null },
-    };
-
-    function median(values) {
-      const v = values.filter((x) => typeof x === "number" && isFinite(x)).sort((a, b) => a - b);
-      const n = v.length;
-      if (!n) return null;
-      if (n % 2 === 1) return v[(n - 1) / 2];
-      return (v[n / 2 - 1] + v[n / 2]) / 2;
-    }
-
-    function clampOutliers(sym, candidates) {
-      const m = median(candidates);
-      if (m == null) return null;
-      // reject values > 0.2% away from median
-      const keep = candidates.filter((v) => Math.abs(v - m) / m <= TOLERANCE);
-      return median(keep.length ? keep : candidates); // fallback to raw median if all clamped
-    }
-
-    function mergeTick(partial) {
-      // record the source’s new value(s)
-      const src = partial.src;
-      if (src && lastBySrc[src]) {
-        if (partial.BTC != null) lastBySrc[src].BTC = partial.BTC;
-        if (partial.ETH != null) lastBySrc[src].ETH = partial.ETH;
-      }
-
-      // build candidate sets
-      const btcCandidates = [lastBySrc.binance.BTC, lastBySrc.kraken.BTC, lastBySrc.bitstamp.BTC];
-      const ethCandidates = [lastBySrc.binance.ETH, lastBySrc.kraken.ETH, lastBySrc.bitstamp.ETH];
-
-      const nextBTC = clampOutliers("BTC", btcCandidates);
-      const nextETH = clampOutliers("ETH", ethCandidates);
-
-      // Only update changed fields; no debounce—every tick is eligible
-      const prev = latestRef.current;
-      const next = {
-        BTC: nextBTC ?? prev.BTC,
-        ETH: nextETH ?? prev.ETH,
-        src: src ?? prev.src,
-        ts: partial.ts ?? Date.now(),
-      };
-
-      // If any value changed, commit in rAF
-      if (next.BTC !== prev.BTC || next.ETH !== prev.ETH) {
-        accept(next);
-      }
-    }
-
+    mountedRef.current = true;
+    fetchOnce();
     return () => {
-      closed = true;
-      try { wsBinance.close(); } catch {}
-      try { wsKraken.close(); } catch {}
-      try { wsBitstamp.close(); } catch {}
-      cancelAnimationFrame(rafRef.current);
+      mountedRef.current = false;
+      clearTimeout(timerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // UI bits
+  const card = (label, val) => (
+    <div style={cardStyle}>
+      <div style={labelStyle}>{label}</div>
+      <div style={priceStyle}>{val ?? "—"}</div>
+    </div>
+  );
+
+  const fmtUSD = (n) =>
+    Number.isFinite(Number(n)) ? Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+
+  const cg = feeds.find(f => f.src === "coingecko");
+  const bn = feeds.find(f => f.src === "binance");
+  const bs = feeds.find(f => f.src === "bitstamp");
+
+  const pill = (name, f) => {
+    const ok = !!(safeNum(f?.BTC) || safeNum(f?.ETH));
+    const hint = f?.err ? ` (${f.err})` : "";
+    return (
+      <span style={{...pillStyle, background: ok ? "rgba(0,200,0,.15)" : "rgba(255,0,0,.12)", borderColor: ok ? "rgba(0,200,0,.5)" : "rgba(255,0,0,.4)"}}>
+        {name}{ok ? " ✓" : " ·"}{f?.err ? hint : ""}
+      </span>
+    );
+  };
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-      <div style={cardStyle}>
-        <div style={labelStyle}>BTC (USD)</div>
-        <div style={priceStyle}>{fmt("BTC", prices.BTC)}</div>
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 12 }}>
+        {card("BTC (USD)", data?.BTC != null ? `$${fmtUSD(data.BTC)}` : null)}
+        {card("ETH (USD)", data?.ETH != null ? `$${fmtUSD(data.ETH)}` : null)}
       </div>
-      <div style={cardStyle}>
-        <div style={labelStyle}>ETH (USD)</div>
-        <div style={priceStyle}>{fmt("ETH", prices.ETH)}</div>
-      </div>
-      <div style={{ gridColumn: "1 / -1", opacity: 0.65, fontSize: 12 }}>
-        Last tick: {prices.ts ? new Date(prices.ts).toLocaleTimeString() : "—"} via {prices.src}
+
+      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.85 }}>
+        <span style={{ marginRight: 8 }}>feeds:</span>
+        {pill("CG", cg)} {pill("BS", bs)} {pill("BN", bn)}
+        <span style={{ marginLeft: 8, opacity: 0.8 }}>
+          · {okFeeds} OK / {errFeeds} ERR · {data?.meta?.elapsed_ms ?? "—"} ms
+        </span>
+        <span style={{ float: "right", opacity: 0.7 }}>
+          next {Math.round(nextMs)}ms
+        </span>
       </div>
     </div>
   );
 }
 
+// styles
 const cardStyle = {
   background: "rgba(255,255,255,0.04)",
-  padding: 16,
-  borderRadius: 12,
   border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 12,
+  padding: 16,
 };
-const labelStyle = { fontSize: 12, letterSpacing: 0.4, marginBottom: 6, opacity: 0.8 };
+const labelStyle = { fontSize: 12, letterSpacing: 0.4, opacity: 0.8, marginBottom: 6 };
 const priceStyle = { fontSize: 28, fontWeight: 700 };
+
+const pillStyle = {
+  display: "inline-block",
+  border: "1px solid transparent",
+  padding: "2px 8px",
+  borderRadius: 999,
+  marginRight: 6,
+  fontSize: 11,
+};
+
