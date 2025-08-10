@@ -1,151 +1,161 @@
-// netlify/functions/get-prices.js
-// Multi-feed crypto prices with strict no-cache and elapsed_ms timing.
-// Feeds: CoinGecko (primary), Binance (ticker), Bitstamp (ticker).
-// Aggregation: remove 1% outliers then take median. Return per-feed meta.
-
+/**
+ * Multi-coin, multi-feed price aggregator (max 3 coins).
+ * Feeds: CoinGecko + Bitstamp + Coinbase Exchange + Kraken (TX-safe).
+ * Query:  /.netlify/functions/get-prices?symbols=BTC,ETH,SOL
+ * Returns: { prices:{BTC:...,ETH:...,...}, ts, meta:{elapsed_ms, perSymbol:{SYM:[{src,BTC/price,err}]}} }
+ */
 const NOCACHE = {
-  "access-control-allow-origin": "*",
-  "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
-  "pragma": "no-cache",
-  "expires": "0",
   "content-type": "application/json",
+  "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+  "access-control-allow-origin": "*",
   "vary": "Origin",
 };
+const UA = "ForgeOfValhalla/1.0";
+const TIMEOUT_MS = 2500;
+const OUTLIER_FRAC = 0.01;
 
-const TIMEOUT_MS = 2500;       // per request timeout
-const TOTAL_BUDGET_MS = 3500;  // whole function should finish quickly
+// Supported coins and provider pair mappings
+const SUPPORTED = ["BTC", "ETH", "SOL", "XRP", "ADA", "LTC", "DOGE"];
 
-// --- tiny utils ---
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-function withTimeout(promise, ms, controller) {
-  const t = setTimeout(() => controller.abort(), ms);
-  return promise.finally(() => clearTimeout(t));
-}
-
-function median(nums) {
-  const a = nums.slice().sort((x, y) => x - y);
-  const n = a.length;
-  if (!n) return NaN;
-  const mid = Math.floor(n / 2);
-  return n % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
-}
-
-function filterOutliers(values, frac = 0.01) {
-  if (values.length < 3) return values.slice();
-  const a = values.slice().sort((x, y) => x - y);
-  const cut = Math.max(1, Math.floor(a.length * frac));
-  return a.slice(cut, a.length - cut);
-}
-
-// --- feed fetchers ---
-async function fetchCoinGecko(signal) {
-  const url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd";
-  const res = await fetch(url, {
-    signal,
-    headers: {
-      "accept": "application/json",
-      "cache-control": "no-cache",
-      "user-agent": "ForgeOfValhalla/1.0"
-    }
-  });
-  if (!res.ok) throw new Error(`CG ${res.status}/${res.statusText}`);
-  const j = await res.json();
-  const BTC = +j?.bitcoin?.usd;
-  const ETH = +j?.ethereum?.usd;
-  return { src: "coingecko", BTC: Number.isFinite(BTC) ? BTC : null, ETH: Number.isFinite(ETH) ? ETH : null, err: null };
-}
-
-async function fetchBinance(signal) {
-  const uBtc = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT";
-  const uEth = "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT";
-  const [r1, r2] = await Promise.all([
-    fetch(uBtc, { signal }),
-    fetch(uEth, { signal }),
-  ]);
-  if (!r1.ok || !r2.ok) throw new Error(`BN ${r1.status || "?"}/${r2.status || "?"}`);
-  const j1 = await r1.json();
-  const j2 = await r2.json();
-  const BTC = +j1?.price;
-  const ETH = +j2?.price;
-  return { src: "binance", BTC: Number.isFinite(BTC) ? BTC : null, ETH: Number.isFinite(ETH) ? ETH : null, err: null };
-}
-
-async function fetchBitstamp(signal) {
-  const uBtc = "https://www.bitstamp.net/api/v2/ticker/btcusd";
-  const uEth = "https://www.bitstamp.net/api/v2/ticker/ethusd";
-  const [r1, r2] = await Promise.all([fetch(uBtc, { signal }), fetch(uEth, { signal })]);
-  if (!r1.ok || !r2.ok) throw new Error(`BS ${r1.status || "?"}/${r2.status || "?"}`);
-  const j1 = await r1.json();
-  const j2 = await r2.json();
-  const BTC = +j1?.last;
-  const ETH = +j2?.last;
-  return { src: "bitstamp", BTC: Number.isFinite(BTC) ? BTC : null, ETH: Number.isFinite(ETH) ? ETH : null, err: null };
-}
-
-async function tryFeed(fn) {
-  const controller = new AbortController();
-  try {
-    return await withTimeout(fn(controller.signal), TIMEOUT_MS, controller);
-  } catch (e) {
-    return { src: fn.name.replace("fetch", "").toLowerCase(), BTC: null, ETH: null, err: String(e.message || e) };
-  }
-}
-
-exports.handler = async () => {
-  const tsStart = Date.now();
-
-  // Run feeds in parallel, but keep total budget reasonable
-  const budget = sleep(TOTAL_BUDGET_MS).then(() => ({ timeoutBudget: true }));
-  const allFeeds = Promise.all([
-    tryFeed(fetchCoinGecko),
-    tryFeed(fetchBinance),
-    tryFeed(fetchBitstamp),
-  ]);
-
-  const result = await Promise.race([allFeeds, budget]);
-
-  let metas;
-  if (Array.isArray(result)) {
-    metas = result;
-  } else {
-    // budget elapsed → return whatever finished so far (best-effort)
-    metas = await Promise.race([
-      allFeeds.catch(() => []),
-      sleep(200).then(() => []),
-    ]);
-  }
-
-  // Pull valid numeric candidates
-  const btcCandidates = metas.map(m => m.BTC).filter(v => Number.isFinite(v));
-  const ethCandidates = metas.map(m => m.ETH).filter(v => Number.isFinite(v));
-
-  // 1% outlier clamp then median
-  const btcFiltered = filterOutliers(btcCandidates, 0.01);
-  const ethFiltered = filterOutliers(ethCandidates, 0.01);
-
-  const BTC = median(btcFiltered);
-  const ETH = median(ethFiltered);
-
-  const elapsed_ms = Math.max(0, Date.now() - tsStart);
-
-  // If everything failed, surface an upstream error (but still include meta)
-  if (!Number.isFinite(BTC) || !Number.isFinite(ETH)) {
-    const payload = {
-      error: "upstream_error",
-      status: 502,
-      ts: Date.now(),
-      meta: { feeds: metas, elapsed_ms },
-    };
-    return { statusCode: 502, headers: NOCACHE, body: JSON.stringify(payload) };
-  }
-
-  const payload = {
-    BTC: +BTC.toFixed(2),
-    ETH: +ETH.toFixed(2),
-    ts: Date.now(),
-    meta: { feeds: metas, elapsed_ms },
-  };
-
-  return { statusCode: 200, headers: NOCACHE, body: JSON.stringify(payload) };
+const CG_ID = { // CoinGecko ids
+  BTC:"bitcoin", ETH:"ethereum", SOL:"solana", XRP:"ripple",
+  ADA:"cardano", LTC:"litecoin", DOGE:"dogecoin"
 };
+// Coinbase product tickers (if missing, we skip Coinbase for that symbol)
+const CB_PROD = {
+  BTC:"BTC-USD", ETH:"ETH-USD", SOL:"SOL-USD", XRP:"XRP-USD",
+  ADA:"ADA-USD", LTC:"LTC-USD", DOGE:"DOGE-USD"
+};
+// Bitstamp pairs (lowercase)
+const BS_PAIR = {
+  BTC:"btcusd", ETH:"ethusd", SOL:"solusd", XRP:"xrpusd",
+  ADA:"adausd", LTC:"ltcusd", DOGE:"dogeusd"
+};
+// Kraken pairs (varies)
+const KR_PAIR = {
+  BTC:"XBTUSD", ETH:"ETHUSD", SOL:"SOLUSD", XRP:"XRPUSD",
+  ADA:"ADAUSD", LTC:"LTCUSD", DOGE:"DOGEUSD"
+};
+
+function timeoutFetch(url, opts = {}, ms = TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
+// --- Feed fetchers (batch where possible) ---
+async function fetchCoinGecko(symbols) {
+  const ids = symbols.map(s => CG_ID[s]).filter(Boolean);
+  if (!ids.length) return [];
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=usd`;
+  try {
+    const res = await timeoutFetch(url, { headers:{ "user-agent": UA, accept:"application/json" }});
+    if (!res.ok) throw new Error(`CG ${res.status}/${res.statusText}`);
+    const j = await res.json();
+    return symbols.map(sym => ({
+      src:"coingecko",
+      sym,
+      price: Number(j?.[CG_ID[sym]]?.usd) || null,
+      err: null
+    }));
+  } catch (e) {
+    return symbols.map(sym => ({ src:"coingecko", sym, price:null, err:String(e.message||e) }));
+  }
+}
+
+async function fetchBitstamp(symbols) {
+  const doable = symbols.filter(s => BS_PAIR[s]);
+  const one = async (sym) => {
+    const url = `https://www.bitstamp.net/api/v2/ticker/${BS_PAIR[sym]}`;
+    try {
+      const r = await timeoutFetch(url, { headers:{ "user-agent": UA, accept:"application/json" }});
+      if (!r.ok) throw new Error(`BS ${r.status}/${r.statusText}`);
+      const j = await r.json();
+      return { src:"bitstamp", sym, price: Number(j?.last)||null, err:null };
+    } catch (e) { return { src:"bitstamp", sym, price:null, err:String(e.message||e) }; }
+  };
+  return Promise.all(doable.map(one));
+}
+
+async function fetchCoinbase(symbols) {
+  const doable = symbols.filter(s => CB_PROD[s]);
+  const one = async (sym) => {
+    const url = `https://api.exchange.coinbase.com/products/${CB_PROD[sym]}/ticker`;
+    try {
+      const r = await timeoutFetch(url, { headers:{ "user-agent": UA, accept:"application/json" }});
+      if (!r.ok) throw new Error(`CB ${r.status}/${r.statusText}`);
+      const j = await r.json();
+      return { src:"coinbase", sym, price: Number(j?.price)||null, err:null };
+    } catch (e) { return { src:"coinbase", sym, price:null, err:String(e.message||e) }; }
+  };
+  return Promise.all(doable.map(one));
+}
+
+async function fetchKraken(symbols) {
+  const doable = symbols.filter(s => KR_PAIR[s]);
+  if (!doable.length) return [];
+  const pairs = doable.map(s => KR_PAIR[s]).join(",");
+  const url = `https://api.kraken.com/0/public/Ticker?pair=${pairs}`;
+  try {
+    const r = await timeoutFetch(url, { headers:{ "user-agent": UA, accept:"application/json" }});
+    if (!r.ok) throw new Error(`KR ${r.status}/${r.statusText}`);
+    const j = await r.json();
+    const res = j?.result || {};
+    return doable.map(sym => {
+      const k = Object.keys(res).find(k => k.toUpperCase().startsWith(sym==="BTC"?"XBT":"ETH"===sym?"ETH":sym) && /USD$/i.test(k));
+      const price = Number(res?.[k]?.c?.[0]) || null;
+      return { src:"kraken", sym, price, err:null };
+    });
+  } catch (e) {
+    return doable.map(sym => ({ src:"kraken", sym, price:null, err:String(e.message||e) }));
+  }
+}
+
+// --- stats helpers ---
+function median(nums){ const n=nums.filter(Number.isFinite).sort((a,b)=>a-b); if(!n.length) return NaN; const m=Math.floor(n.length/2); return n.length%2?n[m]:(n[m-1]+n[m])/2; }
+function filterOutliers(arr, frac=OUTLIER_FRAC){ const xs=arr.filter(Number.isFinite).sort((a,b)=>a-b); if(xs.length<=2) return xs; const drop=Math.floor(xs.length*frac); return xs.slice(drop, xs.length-drop); }
+
+export async function handler(event) {
+  const t0 = Date.now();
+  const raw = String(event?.queryStringParameters?.symbols || "BTC,ETH").toUpperCase();
+  let syms = [...new Set(raw.split(",").map(s => s.trim()).filter(Boolean))].slice(0,3);
+  syms = syms.filter(s => SUPPORTED.includes(s));
+  if (!syms.length) syms = ["BTC","ETH"];
+
+  const [cg, bs, cb, kr] = await Promise.all([
+    fetchCoinGecko(syms),
+    fetchBitstamp(syms),
+    fetchCoinbase(syms),
+    fetchKraken(syms),
+  ]);
+
+  // organize per symbol
+  const perSymbol = {};
+  for (const s of syms) perSymbol[s] = [];
+  [...cg, ...bs, ...cb, ...kr].forEach(r => { if(perSymbol[r.sym]) perSymbol[r.sym].push(r); });
+
+  // aggregate
+  const prices = {};
+  for (const s of syms) {
+    const vals = perSymbol[s].map(f => f.price);
+    const med = median(filterOutliers(vals));
+    if (!Number.isFinite(med)) { prices[s] = null; }
+    else prices[s] = +med.toFixed(2);
+  }
+
+  // if none resolved, 502
+  if (!Object.values(prices).some(Number.isFinite)) {
+    return { statusCode: 502, headers: NOCACHE, body: JSON.stringify({
+      error:"upstream_error", status:502, ts:Date.now(), meta:{elapsed_ms:Date.now()-t0, perSymbol}
+    })};
+  }
+
+  return {
+    statusCode: 200,
+    headers: NOCACHE,
+    body: JSON.stringify({
+      prices, ts: Date.now(),
+      meta:{ elapsed_ms: Date.now()-t0, perSymbol }
+    })
+  };
+}
