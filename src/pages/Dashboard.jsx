@@ -1,35 +1,25 @@
-// src/pages/Dashboard.jsx
-import { Suspense, lazy } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import CoinsSelector from "../components/CoinsSelector";
 import useSession from "../hooks/useSession";
 
 const PricesStream = lazy(() => import("../components/PricesStream"));
 
 export default function Dashboard() {
   const { session } = useSession();
+  const [syms, setSyms] = useState(["BTC","ETH"]);
 
-  if (!session) {
-    // ProtectedRoute should already gate this, but double-safety
-    return <div style={{ color: "#fff", padding: 24 }}>Redirecting to login…</div>;
-  }
-
-  const variant = import.meta.env.VITE_VARIANT ?? "unknown";
+  useEffect(() => { if (!session) { /* router would redirect in your app */ } }, [session]);
 
   return (
-    <div style={{ color: "#fff", padding: 24 }}>
-      <h1>Dashboard</h1>
-      <p style={{ opacity: 0.7, marginTop: -8 }}>
-        Variant: <b>{variant}</b>
-      </p>
+    <div style={{color:"#fff", padding:24}}>
+      <h1 style={{marginTop:16}}>Dashboard</h1>
+      <p style={{marginTop:8}}>Welcome, <b>{session?.user?.email}</b>!</p>
 
-      <p style={{ marginTop: 16 }}>
-        Welcome, <b>{session.user?.email}</b>!
-      </p>
+      <CoinsSelector value={syms} onChange={setSyms} />
 
-      <div style={{ marginTop: 24 }}>
-        <Suspense fallback={<div style={{ opacity: 0.6 }}>Loading live prices…</div>}>
-          <PricesStream />
-        </Suspense>
-      </div>
+      <Suspense fallback={<div style={{opacity:0.6, marginTop:12}}>Loading live prices…</div>}>
+        <PricesStream symbols={syms} />
+      </Suspense>
     </div>
   );
 }
