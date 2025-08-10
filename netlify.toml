@@ -13,3 +13,7 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[scheduled.functions]]
+  name = "bot-scheduler"
+  cron = "* * * * *"
