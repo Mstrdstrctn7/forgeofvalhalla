@@ -73,7 +73,7 @@ function usePrices(pollMs = 3000) {
 
 export default function Dashboard() {
   const { session } = useSession(); // will be null if signed out
-  const { prices, updatedAt, loading, error } = usePrices(3000);
+  const { prices, updatedAt, loading, error } = usePrices(1500);
 
   return (
     <div style={{ padding: 24, color: "#fff" }}>
