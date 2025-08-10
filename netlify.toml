@@ -3,16 +3,19 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# Single Page App routing
+[functions]
+  node_bundler = "esbuild"
+
+# No-cache headers for price endpoint (avoid CDN caching)
+[[headers]]
+  for = "/.netlify/functions/get-prices"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Cache-Control = "no-store, no-cache, must-revalidate, max-age=0"
+    Vary = "Origin"
+
+# SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-# Never cache our live price function
-[[headers]]
-  for = "/.netlify/functions/get-prices"
-  [headers.values]
-    Cache-Control = "no-store, no-cache, must-revalidate, max-age=0"
-    Access-Control-Allow-Origin = "*"
-    Vary = "Origin"
