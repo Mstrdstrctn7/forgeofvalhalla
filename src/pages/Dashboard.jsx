@@ -1,3 +1,4 @@
+import LogoutButton from "../components/LogoutButton";
 import { getSymbols } from "../lib/coins";
 import PriceBar from "../components/PriceBar";
 const SYMS = getSymbols();
@@ -21,7 +22,7 @@ export default function Dashboard() {
         color: "rgb(242,234,227)",
       }}
     >
-      <h1 style={{ marginTop: 0, color: "rgb(226,192,68)" }}>
+      <h1 style={{ marginTop: 0, color: "rgb(226,192,68)" }}> <span style={{float:"right"}}><LogoutButton /></span>
         Forge of Valhalla — Dashboard
       </h1>
       <PricesBoard />
