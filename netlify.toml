@@ -15,6 +15,3 @@
   status = 200
 
 
-[[scheduled.functions]]
-  name = "bot-scheduler"
-  cron = "* * * * *"
