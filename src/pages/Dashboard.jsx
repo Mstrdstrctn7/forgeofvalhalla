@@ -1,8 +1,9 @@
+import DebugBar from "../components/DebugBar";
+import TradeTest from "../components/TradeTest";
+import PriceBar from "../components/PriceBar";
 import LogoutButton from "../components/LogoutButton";
 import { getSymbols } from "../lib/coins";
-import PriceBar from "../components/PriceBar";
 const SYMS = getSymbols();
-import TradeTest from "../components/TradeTest";
 import React from "react";
 import PricesBoard from "../components/PricesBoard";
 // If you also have a <PriceBar />
