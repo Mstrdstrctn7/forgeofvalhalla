@@ -1,6 +1,6 @@
 import { getSymbols } from "../lib/coins";
-const SYMS = getSymbols();
 import PriceBar from "../components/PriceBar";
+const SYMS = getSymbols();
 import TradeTest from "../components/TradeTest";
 import React from "react";
 import PricesBoard from "../components/PricesBoard";
