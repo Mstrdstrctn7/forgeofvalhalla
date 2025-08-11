@@ -1,24 +1,30 @@
 import crypto from "crypto";
 
-// map login email -> env pair (names fixed to your setup)
 const ACCOUNT_MAP = {
   "davilasdynasty@gmail.com": {
     key: process.env.CRYPTOCOM_API_KEY_TAZ,
     secret: process.env.CRYPTOCOM_API_SECRET_TAZ,
   },
-  "Kingpattykake@gmail.com": {
+  "kingpattykake@gmail.com": {
     key: process.env.CRYPTOCOM_API_KEY_HIS,
     secret: process.env.CRYPTOCOM_API_SECRET_HIS,
   },
 };
 
-const ALLOWED = (process.env.ALLOWED_EMAILS || "")
-  .split(",").map(s => s.trim()).filter(Boolean);
+const json = (code, body) => ({
+  statusCode: code,
+  headers: {
+    "Content-Type":"application/json",
+    "Access-Control-Allow-Origin":"*",
+    "Cache-Control":"no-store, no-cache, must-revalidate, max-age=0",
+  },
+  body: JSON.stringify(body),
+});
 
-const PAPER = String(process.env.PAPER_TRADING || "").toLowerCase() === "true";
+const allowed = () => (process.env.ALLOWED_EMAILS||"")
+  .split(",").map(s=>s.trim().toLowerCase()).filter(Boolean);
 
-// Crypto.com v2 signing
-function buildSig({ method, id, api_key, nonce, params, secret }) {
+function sig({ method, id, api_key, nonce, params, secret }) {
   const keys = params ? Object.keys(params).sort() : [];
   const compact = v => (typeof v === "object" ? JSON.stringify(v) : String(v));
   const paramStr = keys.map(k => k + compact(params[k])).join("");
@@ -26,32 +32,32 @@ function buildSig({ method, id, api_key, nonce, params, secret }) {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
 
-async function callPrivate({ email, method, params }) {
-  const creds = ACCOUNT_MAP[email];
+async function callPriv({ email, method, params }) {
+  const key = email.toLowerCase();
+  const creds = ACCOUNT_MAP[key];
   if (!creds?.key || !creds?.secret) throw new Error("No API creds mapped for this email");
-  const id = Date.now();
-  const nonce = Date.now();
+  const id = Date.now(), nonce = Date.now();
   const api_key = creds.key;
-  const sig = buildSig({ method, id, api_key, nonce, params: params || {}, secret: creds.secret });
-  const body = { id, method, api_key, params: params || {}, nonce, sig };
+  const s = sig({ method, id, api_key, nonce, params: params||{}, secret: creds.secret });
+  const body = { id, method, api_key, params: params||{}, nonce, sig: s };
 
   const r = await fetch(`https://api.crypto.com/v2/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body)
   });
-  const data = await r.json();
-  if (!r.ok || data?.code) throw new Error(data?.message || `Exchange error ${r.status}`);
-  return data;
+  const j = await r.json();
+  if (!r.ok || j?.code) throw new Error(j?.message || `Exchange error ${r.status}`);
+  return j;
 }
 
 export async function handler(event) {
   try {
-    if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST" };
+    if (event.httpMethod !== "POST") return json(405, { ok:false, error:"Use POST" });
     const { email, action, params } = JSON.parse(event.body || "{}");
-    if (!email) return { statusCode: 400, body: "Missing email" };
-    if (ALLOWED.length && !ALLOWED.includes(email)) {
-      return { statusCode: 403, body: "Email not allowed" };
+    if (!email) return json(400, { ok:false, error:"Missing email" });
+
+    const allow = allowed();
+    if (allow.length && !allow.includes(email.toLowerCase())) {
+      return json(403, { ok:false, error:"Email not allowed", email, allowed: allow });
     }
 
     const METHOD = {
@@ -63,20 +69,21 @@ export async function handler(event) {
       fills: "private/get-trades",
     }[action];
 
-    if (!METHOD) return { statusCode: 400, body: "Unknown action" };
+    if (!METHOD) return json(400, { ok:false, error:"Unknown action" });
+
+    if ((process.env.PAPER_TRADING||"").toLowerCase()==="true" && action==="order") {
+      return json(200, { ok:false, error:"PAPER_TRADING is ON" });
+    }
 
     if (METHOD === "public/ping") {
       const r = await fetch("https://api.crypto.com/v2/public/ping");
-      return { statusCode: 200, body: await r.text() };
+      const t = await r.text();
+      return json(200, { ok:true, data: t });
     }
 
-    if (PAPER && action === "order") {
-      return { statusCode: 200, body: JSON.stringify({ ok: false, error: "PAPER_TRADING is ON" }) };
-    }
-
-    const data = await callPrivate({ email, method: METHOD, params: params || {} });
-    return { statusCode: 200, body: JSON.stringify({ ok: true, data }) };
+    const data = await callPriv({ email, method: METHOD, params: params||{} });
+    return json(200, { ok:true, data });
   } catch (e) {
-    return { statusCode: 200, body: JSON.stringify({ ok: false, error: e.message }) };
+    return json(200, { ok:false, error: e.message });
   }
 }

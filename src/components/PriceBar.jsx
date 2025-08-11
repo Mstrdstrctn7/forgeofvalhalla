@@ -1,5 +1,6 @@
 import React from "react";
 import useCryptoTicker from "../hooks/useCryptoTicker";
+import { getSymbols } from "../lib/coins";
 
 function Cell({ label, value, sub }) {
   return (
@@ -11,15 +12,16 @@ function Cell({ label, value, sub }) {
   );
 }
 
-export default function PriceBar() {
-  const { ticks, status } = useCryptoTicker();
-  const btc = ticks["BTC_USDT"]?.price;
-  const eth = ticks["ETH_USDT"]?.price;
+export default function PriceBar({ symbols }) {
+  const syms = (symbols && symbols.length) ? symbols : getSymbols();
+  const { ticks, status } = useCryptoTicker(syms);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, margin: "8px 0" }}>
-      <Cell label="BTC/USDT" value={btc?.toLocaleString(undefined,{maximumFractionDigits:2})} />
-      <Cell label="ETH/USDT" value={eth?.toLocaleString(undefined,{maximumFractionDigits:2})} />
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${syms.length+1}, minmax(0,1fr))`, gap: 8, margin: "8px 0" }}>
+      {syms.map(s => {
+        const px = ticks[s]?.price;
+        return <Cell key={s} label={s.replace("_", "/")} value={px?.toLocaleString(undefined,{maximumFractionDigits:6})} />;
+      })}
       <Cell label="Feed" value={status === "live" ? "Live WS" : status} />
     </div>
   );
