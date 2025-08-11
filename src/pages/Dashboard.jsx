@@ -1,7 +1,10 @@
+import PriceBar from "../components/PriceBar";
 import TradeTest from "../components/TradeTest";
 import React from "react";
 import PricesBoard from "../components/PricesBoard";
-// If you also have a Trade form component, keep/import it here:
+// If you also have a <PriceBar />
+
+Trade form component, keep/import it here:
 let TradeForm;
 try { TradeForm = (await import("../components/TradeForm.jsx")).default; } catch {}
 
