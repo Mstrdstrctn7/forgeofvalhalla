@@ -50,6 +50,18 @@ async function callPriv({ email, method, params }) {
 }
 
 export async function handler(event) {
+  // ===== PAPER SIM =====
+  // When PAPER_TRADING=true, short-circuit private calls for testing.
+  // MARKERS: PAPER_SIM_START / PAPER_SIM_END
+  /* PAPER_SIM_START */
+  const paperSim = {
+    balances(){ return { ok:true, data:{ result:{ accounts:[{ currency:"USDT", available:"1000" }, { currency:"BTC", available:"0.005" }, { currency:"ETH", available:"0.1" }] } } }; },
+    order(params){ return { ok:true, data:{ result:{ order_id: `SIM-${Date.now()}`, status:"FILLED", params } } }; },
+    open_orders(){ return { ok:true, data:{ result:{ order_list:[] } } }; },
+    fills(){ return { ok:true, data:{ result:{ trade_list:[] } } }; }
+  };
+  /* PAPER_SIM_END */
+
   try {
     if (event.httpMethod !== "POST") return json(405, { ok:false, error:"Use POST" });
     const { email, action, params } = JSON.parse(event.body || "{}");
@@ -68,6 +80,13 @@ export async function handler(event) {
       open_orders: "private/get-open-orders",
       fills: "private/get-trades",
     }[action];
+    // If PAPER_TRADING, simulate for private actions
+    if ((process.env.PAPER_TRADING||"").toLowerCase()==="true") {
+      if (action==="balances") return json(200, paperSim.balances());
+      if (action==="order")    return json(200, paperSim.order(params));
+      if (action==="open_orders") return json(200, paperSim.open_orders());
+      if (action==="fills")    return json(200, paperSim.fills());
+    }
 
     if (!METHOD) return json(400, { ok:false, error:"Unknown action" });
 
