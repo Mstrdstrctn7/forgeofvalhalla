@@ -1,79 +1,82 @@
-import { supa } from './lib/supa.js';
-import { decryptJson } from './lib/crypto.js';
-import { createMarketOrder } from './lib/cryptoCom.js';
+import crypto from "crypto";
 
-const PAPER = (process.env.PAPER_TRADING || 'true').toLowerCase() === 'true';
-const ALLOWED = (process.env.ALLOWED_EMAILS || '')
-  .split(',')
-  .map(s => s.trim().toLowerCase())
-  .filter(Boolean);
+// map login email -> env pair (names fixed to your setup)
+const ACCOUNT_MAP = {
+  "davilasdynasty@gmail.com": {
+    key: process.env.CRYPTOCOM_API_KEY_TAZ,
+    secret: process.env.CRYPTOCOM_API_SECRET_TAZ,
+  },
+  "Kingpattykake@gmail.com": {
+    key: process.env.CRYPTOCOM_API_KEY_HIS,
+    secret: process.env.CRYPTOCOM_API_SECRET_HIS,
+  },
+};
 
-function j(status, obj) {
-  return {
-    statusCode: status,
-    headers: { 'cache-control': 'no-store', 'content-type': 'application/json' },
-    body: JSON.stringify(obj),
-  };
+const ALLOWED = (process.env.ALLOWED_EMAILS || "")
+  .split(",").map(s => s.trim()).filter(Boolean);
+
+const PAPER = String(process.env.PAPER_TRADING || "").toLowerCase() === "true";
+
+// Crypto.com v2 signing
+function buildSig({ method, id, api_key, nonce, params, secret }) {
+  const keys = params ? Object.keys(params).sort() : [];
+  const compact = v => (typeof v === "object" ? JSON.stringify(v) : String(v));
+  const paramStr = keys.map(k => k + compact(params[k])).join("");
+  const payload = method + id + api_key + nonce + paramStr;
+  return crypto.createHmac("sha256", secret).update(payload).digest("hex");
+}
+
+async function callPrivate({ email, method, params }) {
+  const creds = ACCOUNT_MAP[email];
+  if (!creds?.key || !creds?.secret) throw new Error("No API creds mapped for this email");
+  const id = Date.now();
+  const nonce = Date.now();
+  const api_key = creds.key;
+  const sig = buildSig({ method, id, api_key, nonce, params: params || {}, secret: creds.secret });
+  const body = { id, method, api_key, params: params || {}, nonce, sig };
+
+  const r = await fetch(`https://api.crypto.com/v2/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok || data?.code) throw new Error(data?.message || `Exchange error ${r.status}`);
+  return data;
 }
 
 export async function handler(event) {
   try {
-    if (event.httpMethod !== 'POST') return j(405, { error: 'Method Not Allowed' });
-
-    const email = (event.headers['x-user-email'] || '').toLowerCase();
-    if (!email || !ALLOWED.includes(email)) return j(401, { error: 'Unauthorized' });
-
-    let body;
-    try { body = JSON.parse(event.body || '{}'); }
-    catch { return j(400, { error: 'bad_json' }); }
-
-    const { instrument, side, quantity } = body;
-    if (!instrument || !side || !quantity) {
-      return j(400, { error: 'instrument, side, quantity required' });
+    if (event.httpMethod !== "POST") return { statusCode: 405, body: "Use POST" };
+    const { email, action, params } = JSON.parse(event.body || "{}");
+    if (!email) return { statusCode: 400, body: "Missing email" };
+    if (ALLOWED.length && !ALLOWED.includes(email)) {
+      return { statusCode: 403, body: "Email not allowed" };
     }
 
-    // fetch encrypted creds
-    const { data, error } = await supa
-      .from('user_creds')
-      .select('enc')
-      .eq('email', email)
-      .eq('exchange', 'crypto_com')
-      .single();
+    const METHOD = {
+      ping: "public/ping",
+      balances: "private/get-account-summary",
+      order: "private/create-order",
+      cancel: "private/cancel-order",
+      open_orders: "private/get-open-orders",
+      fills: "private/get-trades",
+    }[action];
 
-    if (error) return j(500, { error: 'supa', detail: error.message });
-    if (!data?.enc) return j(400, { error: 'no_creds' });
+    if (!METHOD) return { statusCode: 400, body: "Unknown action" };
 
-    let apiKey, apiSecret;
-    try { ({ apiKey, apiSecret } = decryptJson(data.enc)); }
-    catch (e) { return j(500, { error: 'decrypt', detail: String(e) }); }
-
-    if (PAPER) {
-      const paperOrder = {
-        email,
-        exchange: 'crypto_com',
-        instrument,
-        side,
-        quantity,
-        status: 'filled',
-        filled_qty: quantity,
-        price: null,
-      };
-      const { error: pErr } = await supa.from('paper_orders').insert(paperOrder);
-      if (pErr) return j(500, { error: 'paper_insert', detail: pErr.message });
-      return j(200, { ok: true, mode: 'paper', order: paperOrder });
+    if (METHOD === "public/ping") {
+      const r = await fetch("https://api.crypto.com/v2/public/ping");
+      return { statusCode: 200, body: await r.text() };
     }
 
-    // LIVE order
-    try {
-      const live = await createMarketOrder({ apiKey, apiSecret, instrument, side, quantity });
-      await supa.from('live_orders').insert({
-        email, exchange: 'crypto_com', instrument, side, quantity, provider_payload: live,
-      });
-      return j(200, { ok: true, mode: 'live', result: live });
-    } catch (e) {
-      return j(500, { error: 'provider', detail: e?.response?.data || String(e) });
+    if (PAPER && action === "order") {
+      return { statusCode: 200, body: JSON.stringify({ ok: false, error: "PAPER_TRADING is ON" }) };
     }
+
+    const data = await callPrivate({ email, method: METHOD, params: params || {} });
+    return { statusCode: 200, body: JSON.stringify({ ok: true, data }) };
   } catch (e) {
-    return j(500, { error: 'unknown', detail: String(e) });
+    return { statusCode: 200, body: JSON.stringify({ ok: false, error: e.message }) };
   }
 }

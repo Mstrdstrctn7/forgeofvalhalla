@@ -1,3 +1,4 @@
+import TradeTest from "../components/TradeTest";
 import React from "react";
 import PricesBoard from "../components/PricesBoard";
 // If you also have a Trade form component, keep/import it here:
@@ -20,6 +21,7 @@ export default function Dashboard() {
       </h1>
       <PricesBoard />
       {TradeForm ? <TradeForm /> : null}
-    </div>
+      <TradeTest />
+</div>
   );
 }
