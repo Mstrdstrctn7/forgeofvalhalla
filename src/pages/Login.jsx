@@ -1,3 +1,4 @@
+import { daily } from "../lib/daily";
 import React, { useMemo, useState } from "react";
 import supa from "../lib/supa";
 
@@ -9,9 +10,9 @@ const PATH_QUOTES = [
   "Stand where sparks fall; speak when steel cools.",
 ];
 const MOMMA_QUOTES = [
-  "Guided by Momma Joe — may his counsel steady the hand.",
+  "Guided by Momma Joe {daily("momma")}
   "By Momma Joe’s word, measure twice, strike once.",
-  "Hold fast — Momma Joe keeps the keel.",
+  "Hold fast {daily("momma")}
   "Momma Joe watches the flame; we watch our aim.",
 ];
 function dailyPick(list){
@@ -49,14 +50,14 @@ export default function Login(){
         <div className="mj-banner" style={{marginTop:4, marginBottom:12}}>
           <span className="mj-crown" aria-hidden>👑</span>
           <strong>Guided by&nbsp;Momma&nbsp;Joe</strong>
-          <span className="text-dim">— may his counsel steady the hand.</span>
+          <span className="text-dim">{daily("momma")}</span>
         </div>
 
         <header className="fov-hero fov-card">
           <h1 className="fov-title"><span className="gold">Forge</span> of Valhalla</h1>
           <p className="fov-lead">
             Past the veil of winter and war, chosen hands gather at the anvil.
-            This forge is private—oathbound and invitation-only. The hall opens only
+            This forge is private{daily("momma")}
             to those named upon the shield wall.
           </p>
           <p className="fov-lead" style={{marginTop:8}}>{pathLine}</p>

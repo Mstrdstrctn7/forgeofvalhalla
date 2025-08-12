@@ -336,3 +336,19 @@ body { accent-color: var(--gold); }
 .fov-auth .btn:hover{ filter: brightness(1.06); }
 .fov-auth .btn:active{ transform: translateY(1px); }
 
+
+/* FoV forge readability v3 */
+.fov-card.forge-hero{
+  background: radial-gradient(140% 120% at 50% 0%, rgba(16,16,16,.78) 0%, rgba(12,12,12,.70) 60%, rgba(10,10,10,.62) 100%);
+  backdrop-filter: blur(2px);
+}
+.forge-hero .fov-title{ font-size: clamp(26px, 5.6vw, 36px); }
+.forge-hero .fov-lead{
+  font-size: clamp(14px, 3.8vw, 18px);
+  line-height: 1.55;
+  letter-spacing: .08px;
+  color: var(--ink);
+  opacity: .98;
+  max-width: 68ch;
+}
+.forge-hero .fov-lead + p{ margin-top: 10px; }
