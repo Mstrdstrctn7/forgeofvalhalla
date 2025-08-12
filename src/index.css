@@ -98,3 +98,138 @@ footer{opacity:.65;padding:24px 0;text-align:center;font-size:13px}
   background: url("/valhalla-hall.jpg") center/cover no-repeat fixed;
   position:absolute; inset:0; z-index:-2;
 }
+
+/* FoV Login revamp */
+:root{
+  --gold:#d4af37; --gold-dim:#9a8031; --ink:#e7e7e7; --ink-dim:#c9c9c9;
+  --bg:#0a0a0a; --panel:#0e0e0e; --red:#a4161a; --ok:#198754; --warn:#b02a37;
+}
+
+html, body, #root { background: var(--bg); color: var(--ink); }
+
+.fov-login {
+  min-height: 100svh; /* mobile friendly viewport */
+  background:
+    radial-gradient(ellipse at 50% 10%, rgba(0,0,0,.25), rgba(0,0,0,.6) 60%, rgba(0,0,0,.9) 100%),
+    linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.55)),
+    url("/img/valhalla-hall.jpg") center / cover no-repeat fixed;
+  display: flex; flex-direction: column;
+}
+
+.fov-wrap{
+  width: 100%;
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 18px clamp(16px, 4vw, 28px);
+}
+
+.fov-hero{
+  text-shadow: 0 2px 10px rgba(0,0,0,.65);
+  margin-top: 12px;
+}
+
+.fov-title{
+  font-weight: 900;
+  letter-spacing: .3px;
+  color: var(--ink);
+  margin: 6px 0 10px;
+  font-size: clamp(28px, 6.8vw, 42px);
+}
+.fov-title .gold{ color: var(--gold); }
+
+.fov-lead{
+  color: var(--ink);
+  opacity: .95;
+  font-size: clamp(14px, 3.8vw, 18px);
+  line-height: 1.6;
+}
+
+.fov-card{
+  background: rgba(10,10,10,.68);
+  border: 1px solid rgba(212,175,55,.18);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  backdrop-filter: blur(2px);
+}
+
+.fov-section-title{
+  font-weight: 800;
+  color: var(--gold);
+  margin: 10px 0 12px;
+  font-size: clamp(18px, 4.8vw, 22px);
+}
+
+.fov-shield{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.fov-slot{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 10px 12px; border-radius: 12px; background: rgba(20,20,20,.7);
+  border: 1px solid rgba(255,255,255,.06);
+}
+.fov-slot .badge{
+  font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: 700;
+  background: #123; color: #cfe; border: 1px solid rgba(255,255,255,.15);
+}
+.badge.ok{ background:#102d1d; color:#bff7d1; border-color:#2f7b51; }
+.badge.res{ background:#2a0d10; color:#ffd6d6; border-color:#7b2f3b; }
+
+@media (min-width:760px){
+  .fov-grid{ display:grid; grid-template-columns: 1.3fr .9fr; gap: 16px; }
+}
+
+.fov-oath{
+  display:grid; grid-template-columns: auto 1fr; gap: 10px;
+  align-items: start;
+}
+.fov-runes{
+  color: var(--gold); letter-spacing: .35em; font-size: 16px; opacity:.9;
+}
+
+/* Momma Joe glowing banner */
+.mj-banner{
+  display:flex; align-items:center; gap:10px;
+  background: radial-gradient(90% 120% at 20% 30%, rgba(255,0,0,.1), rgba(212,175,55,.06) 40%, rgba(0,0,0,0) 70%),
+              linear-gradient(180deg, rgba(180,30,30,.25), rgba(90,0,0,.2));
+  padding: 10px 12px; border-radius: 999px; color: var(--ink);
+  width: fit-content; border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 0 25px rgba(212,175,55,.08), inset 0 0 22px rgba(160,10,10,.15);
+  animation: mjGlow 3.2s ease-in-out infinite alternate;
+}
+.mj-crown{ filter: drop-shadow(0 0 6px rgba(212,175,55,.6)); }
+@keyframes mjGlow{
+  from { box-shadow: 0 0 18px rgba(212,175,55,.08), inset 0 0 12px rgba(160,10,10,.06); }
+  to   { box-shadow: 0 0 32px rgba(212,175,55,.25), inset 0 0 28px rgba(160,10,10,.22); }
+}
+
+/* Sign-in pinned block */
+.fov-auth{
+  position: sticky; bottom: 0; z-index: 2;
+  margin-top: 18px;
+}
+.fov-auth .panel{
+  background: rgba(5,5,5,.82);
+  border: 1px solid rgba(212,175,55,.2);
+  border-radius: 14px;
+  padding: 12px;
+  backdrop-filter: blur(3px);
+}
+.fov-auth label{ font-size:12px; opacity:.9; display:block; margin: 6px 0 4px; }
+.fov-auth input{
+  width:100%; background:#101010; border:1px solid #2a2a2a; color:var(--ink);
+  border-radius:10px; padding: 10px 12px;
+}
+.fov-auth .row{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fov-auth .btn{
+  width:100%; margin-top:10px; font-weight:800;
+  background: linear-gradient(#caa534,#8e6f21);
+  color:#111; border:0; border-radius:10px; padding: 10px 12px;
+  box-shadow: 0 8px 18px rgba(0,0,0,.45), inset 0 2px 0 rgba(255,255,255,.18);
+}
+.fov-auth .btn:active{ transform: translateY(1px); }
+
+/* tiny helper */
+.text-dim{ color: var(--ink-dim); }
