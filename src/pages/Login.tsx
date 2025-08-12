@@ -25,7 +25,7 @@ export default function Login(){
           style={{width:"100%",marginBottom:12,padding:"10px 12px",borderRadius:10,background:"#1a1a1a",border:"1px solid #222",color:"#fff"}}/>
         {err && <p style={{color:"#f87171",fontSize:12,marginBottom:8}}>{err}</p>}
         <button disabled={busy}
-          style={{width:"100%",marginBottom:10,padding:"10px 12px",borderRadius:10,background:"#059669",border:"1px solid #0f766e",color:"#fff",opacity:busy?.6:1}}>
+          style={{width:"100%",marginBottom:10,padding:"10px 12px",borderRadius:10,background:"#059669",border:"1px solid #0f766e",color:"#fff",opacity: busy ? 0.6 : 1}}>
           {busy?"Please wait…":(mode==="login"?"Sign in":"Create account")}
         </button>
         <p style={{fontSize:12,opacity:.8}}>

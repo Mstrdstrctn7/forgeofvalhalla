@@ -28,7 +28,7 @@ export default function CoinTable(){
         <button onClick={load} style={{padding:"8px 12px",borderRadius:10,background:"#1f2937",border:"1px solid #374151"}}>Refresh</button>
       </div>
       {err && <div style={{color:"#f87171",fontSize:12,marginBottom:8}}>Error: {err}</div>}
-      <div style={{overflow:auto}}>
+      <div style={{ overflow: 'auto' }}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
           <thead><tr style={{textAlign:"left",opacity:.7}}>
             <th style={{padding:"6px 8px"}}>Symbol</th>
