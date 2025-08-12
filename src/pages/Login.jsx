@@ -1,8 +1,8 @@
 // src/pages/Login.jsx
 import React, { useState } from "react";
-import supa from "../lib/supa"; // change if your client lives elsewhere
+import supa from "../lib/supa";
 
-// Public-domain background (Valhalla-style)
+// public-domain Valhalla painting
 const bgUrl =
   "https://upload.wikimedia.org/wikipedia/commons/9/94/Valhalla_by_Max_Br%C3%BCckner_1896.jpg";
 
@@ -29,92 +29,106 @@ export default function Login() {
 
   return (
     <div style={sx.page}>
-      {/* Layers */}
-      <div style={{ ...sx.layer, backgroundImage: `url(${bgUrl})`, opacity: 0.28 }} />
-      <div style={{ ...sx.layer, background: "radial-gradient(60% 40% at 50% 15%, rgba(212,175,55,.10), transparent 60%)" }} />
-      <div style={{ ...sx.layer, background: "linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.94) 70%, #000 100%)" }} />
-      <div style={{ ...sx.layer, boxShadow: "inset 0 0 260px #000" }} />
+      {/* one tiny stylesheet for animations & responsive layout */}
+      <style>{css}</style>
 
-      {/* Top ribbon – Momma Joe */}
-      <div style={sx.ribbon}>
-        <span role="img" aria-label="raven">🜲</span>&nbsp;
-        Guided by <b>Momma Joe</b> — may his counsel steady the hand.
+      {/* Layers */}
+      <div className="layer" style={{ backgroundImage: `url(${bgUrl})`, opacity: .26 }} />
+      <div className="layer" style={{ background: "radial-gradient(60% 40% at 50% 15%, rgba(212,175,55,.08), transparent 60%)" }} />
+      <div className="layer noise" />
+      <div className="layer" style={{ background: "linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.94) 70%, #000)" }} />
+
+      {/* Forge ribbon – animated glow */}
+      <div className="ribbon forgeGlow">
+        <Crown />
+        <span className="ribbonText">
+          Guided by <b>Momma Joe</b> — may his counsel steady the hand.
+        </span>
       </div>
 
-      <div style={sx.content}>
-        {/* Left column: crest, lore, roster, oath */}
-        <section style={sx.left}>
-          <div style={sx.crestWrap}><Valknut /></div>
-          <h1 style={sx.title}><span style={sx.gold}>Forge</span> of Valhalla</h1>
+      {/* Content grid (1 col on mobile). Card is ordered last on mobile. */}
+      <div className="grid">
+        {/* Crest + Lore + Roster + Oath */}
+        <section className="left">
+          <div className="crestCard">
+            <CrossedAxes />
+          </div>
 
-          <p style={sx.lore}>
-            Past the veil of winter and war, chosen hands gather at the anvil. This forge
-            is private—oath-bound and invitation-only. The hall opens only to those named
-            upon the shield wall.
+          <h1 className="title">
+            <span className="gold">Forge</span> of Valhalla
+          </h1>
+
+          <p className="lore">
+            Past the veil of winter and war, chosen hands gather at the anvil.
+            This forge is private—oath-bound and invitation-only. The hall opens
+            only to those named upon the shield wall.
           </p>
 
           {/* Roster */}
-          <div style={sx.panel}>
-            <div style={sx.panelHead}>Shield Wall</div>
-            <ul style={sx.rosterList}>
-              <RosterRow name="PattyCake" tag="(Patrick)" status="active" />
-              <RosterRow name="The DumbAssRedneck" tag="(Taz)" status="active" />
-              <RosterRow name="The Joker" tag="(Tyler)" status="reserved" />
-              <RosterRow name="DoubleD" tag="(Dalton)" status="reserved" />
+          <div className="panel">
+            <div className="panelHead">Shield Wall</div>
+            <ul className="roster">
+              <RosterRow name="PattyCake" status="active" />
+              <RosterRow name="The DumbAssRedneck" status="active" />
+              <RosterRow name="The Joker" status="reserved" />
+              <RosterRow name="DoubleD" status="reserved" />
             </ul>
-            <div style={sx.note}>
-              New warriors are invited by the Jarl only. No sign-ups. No exceptions.
-            </div>
+            <div className="note">New warriors are invited by the Jarl only. No sign-ups. No exceptions.</div>
           </div>
 
-          {/* Oath / flavor */}
-          <div style={sx.oath}>
+          {/* Runes bar */}
+          <div className="runesBar">
             <Runes />
+          </div>
+
+          {/* Oath – compact & mobile-friendly */}
+          <div className="oath">
+            <Hammer />
             <div>
-              <div style={sx.oathHead}>Oath of the Forge</div>
-              <div style={sx.oathText}>
+              <div className="oathHead">Oath of the Forge</div>
+              <div className="oathText">
                 Steel before silver. Signal before noise. Loyalty before glory.
               </div>
             </div>
           </div>
         </section>
 
-        {/* Right column: login card */}
-        <section style={sx.card}>
-          <div style={sx.cardHead}><span style={sx.dotLive} /> Secure Entry</div>
+        {/* Sign-in card (bottom on mobile) */}
+        <section className="card">
+          <div className="cardHead"><span className="dotLive" /> Secure Entry</div>
 
           <form onSubmit={handleLogin} style={{ marginTop: 12 }}>
-            <label style={sx.label}>Email</label>
+            <label className="label">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@email.com"
               required
-              style={sx.input}
+              className="input"
               autoComplete="username"
             />
 
-            <label style={sx.label}>Password</label>
+            <label className="label">Password</label>
             <input
               type="password"
               value={pw}
               onChange={(e) => setPw(e.target.value)}
               placeholder="••••••••"
               required
-              style={sx.input}
+              className="input"
               autoComplete="current-password"
             />
 
-            <button type="submit" disabled={loading} style={sx.btn}>
+            <button type="submit" disabled={loading} className="btn">
               {loading ? "Opening the gates…" : "Enter Valhalla"}
             </button>
 
-            {err && <div style={sx.err}>⚠ {err}</div>}
+            {err && <div className="err">⚠ {err}</div>}
           </form>
 
-          <div style={sx.smallPrint}>
-            Authorized use only. Activity is logged in the mead-hall ledger.
+          <div className="smallPrint">
+            Authorized use only. Activity is recorded in the mead-hall ledger.
           </div>
         </section>
       </div>
@@ -122,155 +136,166 @@ export default function Login() {
   );
 }
 
-/* ---------- Small pieces ---------- */
-function RosterRow({ name, tag, status }) {
+/* ---------------- Pieces ---------------- */
+function RosterRow({ name, status }) {
   const muted = status !== "active";
   return (
-    <li style={{ ...sx.rosterItem, opacity: muted ? 0.6 : 1 }}>
-      <span style={sx.badge}>{name}</span>
-      <span style={sx.tag}>{tag}</span>
+    <li className="rosterItem" style={{ opacity: muted ? 0.6 : 1 }}>
+      <span className="badge">{name}</span>
       <span style={{ flex: 1 }} />
-      <span style={{ ...sx.status, background: muted ? "#4a1f1f" : "#1a7f37" }}>
+      <span className="status" style={{ background: muted ? "#4a1f1f" : "#1a7f37" }}>
         {muted ? "reserved" : "active"}
       </span>
     </li>
   );
 }
 
-function Valknut() {
+function CrossedAxes() {
   return (
-    <svg viewBox="0 0 100 100" width="90" height="90" style={sx.crest}>
-      <polygon points="50,5 93,80 7,80" fill="none" stroke="#d4af37" strokeWidth="3" />
-      <polygon points="50,20 83,77 17,77" fill="none" stroke="#c0952d" strokeWidth="3" />
-      <polygon points="50,35 73,74 27,74" fill="none" stroke="#8a6b1b" strokeWidth="3" />
-      <defs><filter id="g"><feGaussianBlur stdDeviation="0.8" /></filter></defs>
-      <polygon points="50,5 93,80 7,80" fill="none" stroke="#d4af37" strokeWidth="3" filter="url(#g)" />
+    <svg viewBox="0 0 128 128" width="86" height="86" className="crest">
+      <defs>
+        <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+          <stop stopColor="#d4af37" />
+          <stop offset="1" stopColor="#9a8031" />
+        </linearGradient>
+        <filter id="soft"><feGaussianBlur stdDeviation="1.2" /></filter>
+      </defs>
+      <path d="M22 102 L64 60 L106 102" stroke="url(#g)" strokeWidth="6" fill="none" />
+      <path d="M40 26 l18 18 -36 36" stroke="url(#g)" strokeWidth="6" fill="none" />
+      <path d="M88 26 l-18 18 36 36" stroke="url(#g)" strokeWidth="6" fill="none" />
+      <circle cx="64" cy="60" r="44" stroke="url(#g)" strokeWidth="3" fill="none" filter="url(#soft)" />
+    </svg>
+  );
+}
+
+function Hammer() {
+  return (
+    <svg viewBox="0 0 64 64" width="40" height="40">
+      <rect x="16" y="8" width="32" height="18" rx="3" fill="#2a2a2a" stroke="#6b5a22" />
+      <rect x="30" y="24" width="4" height="28" rx="2" fill="#6b5a22" />
+    </svg>
+  );
+}
+
+function Crown() {
+  return (
+    <svg viewBox="0 0 24 18" width="18" height="18" style={{ marginRight: 6 }}>
+      <path d="M2 14 L5 5 L12 12 L19 4 L22 14 Z" fill="#ffd6d6" opacity=".85" />
     </svg>
   );
 }
 
 function Runes() {
   return (
-    <svg viewBox="0 0 220 28" width="220" height="28" style={{ opacity: .9 }}>
-      <text x="0" y="20" fill="#d4af37" style={{ fontFamily: "serif", letterSpacing: 4 }}>
+    <svg viewBox="0 0 360 24" width="100%" height="24">
+      <text x="0" y="18" fill="#d4af37" style={{ fontFamily: "serif", letterSpacing: 5 }}>
         ᚠᛟᚱᚷᛖ · ᛟᚠ · ᚹᚨᛚᚺᚨᛚᛚᚨ
       </text>
     </svg>
   );
 }
 
-/* ---------- styles ---------- */
-const gold = "#d4af37";
-const goldDim = "#9a8031";
-const panel = "rgba(12,12,12,.86)";
-const ink = "#e6e3da";
-const red = "#a4161a";
+/* ---------------- Styles ---------------- */
+const css = `
+:root{
+  --gold:#d4af37; --gold-dim:#9a8031; --ink:#e6e3da; --panel:rgba(12,12,12,.86); --red:#a4161a;
+}
+*{ box-sizing:border-box }
+.layer{ position:absolute; inset:0; background-size:cover; background-position:center; pointer-events:none }
+.layer.noise {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.05"/></svg>');
+  mix-blend-mode:soft-light;
+}
+
+.grid{
+  position:relative; z-index:2;
+  display:grid; gap:22px;
+  grid-template-columns:1fr; padding:32px 16px 42px; max-width:980px; margin:0 auto;
+}
+.left{ color:var(--ink); display:flex; flex-direction:column; gap:14px; order:1 }
+.card{ order:2 } /* on mobile, card appears at bottom */
+
+@media (min-width:860px){
+  .grid{ grid-template-columns:1.15fr .85fr; gap:28px; padding:40px 22px 60px }
+  .left{ order:1 }
+  .card{ order:2; align-self:start }
+}
+
+.title{ font-size:36px; margin:6px 0 6px; letter-spacing:.5px; color:var(--ink); font-weight:800 }
+.gold{ color:var(--gold); }
+.lore{ line-height:1.6; opacity:.92 }
+
+.crestCard{
+  width:96px;height:96px;border-radius:18px;
+  background:rgba(212,175,55,.08);display:grid;place-items:center;
+  border:1px solid rgba(212,175,55,.25); box-shadow:0 10px 40px rgba(0,0,0,.6)
+}
+.crest{ filter: drop-shadow(0 0 8px rgba(212,175,55,.25)) }
+
+.panel{
+  background:var(--panel); border:1px solid #d4af3733; border-radius:14px; padding:14px;
+  box-shadow:0 12px 40px rgba(0,0,0,.5)
+}
+.panelHead{ color:var(--gold); font-weight:800; margin-bottom:8px; letter-spacing:.5px }
+
+.roster{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px }
+.rosterItem{ display:flex; align-items:center; gap:10px; padding:8px 10px; background:rgba(255,255,255,.02); border-radius:10px; border:1px solid rgba(255,255,255,.05) }
+.badge{ background:linear-gradient(180deg, var(--gold), var(--gold-dim)); color:#111; padding:4px 10px; border-radius:999px; font-weight:900; font-size:13px }
+.status{ color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:.6px }
+.note{ margin-top:8px; color:#a6a6a6; font-size:12px }
+
+.runesBar{ margin-top:8px; padding:10px 12px; border:1px solid #d4af3726; border-radius:10px; background:rgba(212,175,55,.04) }
+
+.oath{
+  margin-top:12px; display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:center;
+  padding:12px; background:rgba(212,175,55,.05); border:1px solid #d4af3726; border-radius:12px
+}
+.oathHead{ color:var(--gold); font-weight:800; margin-bottom:2px; letter-spacing:.4px }
+.oathText{ color:#d3d3d3 }
+
+.card{
+  background:var(--panel); border-radius:16px; border:1px solid #d4af3726; padding:18px; color:var(--ink);
+  box-shadow:0 22px 54px rgba(0,0,0,.65)
+}
+.cardHead{ display:flex; align-items:center; gap:8px; font-weight:800; color:var(--gold); letter-spacing:.6px }
+.dotLive{ width:10px; height:10px; border-radius:999px; background:#1a7f37; box-shadow:0 0 10px rgba(26,127,55,.8); display:inline-block }
+
+.label{ display:block; font-size:12px; color:#c9c9c9; margin-top:10px; margin-bottom:6px }
+.input{ width:100%; padding:10px 12px; border-radius:10px; background:#0f0f0f; border:1px solid #2a2a2a; color:var(--ink); outline:none }
+.btn{
+  width:100%; margin-top:14px; padding:10px 12px; border-radius:10px; border:1px solid #5c4616;
+  background:linear-gradient(180deg, var(--gold), var(--gold-dim)); color:#111; font-weight:900; letter-spacing:.4px; cursor:pointer
+}
+.err{ margin-top:12px; background:#220000; border:1px solid var(--red); color:#ffd6d6; padding:8px 10px; border-radius:10px }
+.smallPrint{ margin-top:12px; color:#a0a0a0; font-size:12px; opacity:.85 }
+
+.ribbon{
+  position:relative; z-index:3; display:inline-flex; align-items:center; gap:10px;
+  margin:14px 16px 0; padding:10px 14px; border-radius:999px;
+  border:1px solid #6f1015; color:#ffd6d6; font-weight:800; box-shadow:0 12px 40px rgba(164,22,26,.35);
+  overflow:hidden;
+}
+.ribbonText{ position:relative; z-index:2 }
+.forgeGlow{
+  background: linear-gradient(90deg, #801313, #a4161a, #d4af37, #a4161a, #801313);
+  background-size: 300% 100%;
+  animation: ribbonShift 9s linear infinite, ribbonPulse 2.4s ease-in-out infinite;
+}
+.forgeGlow::after{
+  /* sparks / embers */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background: radial-gradient(6px 6px at 22% 40%, rgba(212,175,55,.55), transparent 60%),
+              radial-gradient(4px 4px at 70% 20%, rgba(255,200,120,.35), transparent 60%),
+              radial-gradient(5px 5px at 42% 70%, rgba(255,170,90,.35), transparent 60%);
+  mix-blend-mode:screen; filter:blur(.2px);
+}
+@keyframes ribbonShift { from{background-position:0% 0} to{background-position:100% 0} }
+@keyframes ribbonPulse {
+  0%,100% { box-shadow:0 12px 40px rgba(164,22,26,.35); filter: saturate(1); }
+  50%     { box-shadow:0 18px 60px rgba(212,175,55,.45); filter: saturate(1.15); }
+}
+`;
 
 const sx = {
-  page: { position: "relative", minHeight: "100vh", backgroundColor: "#000", overflow: "hidden" },
-  layer: { position: "absolute", inset: 0, backgroundSize: "cover", backgroundPosition: "center", pointerEvents: "none" },
-
-  ribbon: {
-    position: "relative",
-    zIndex: 3,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    margin: "14px 18px 0",
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: `linear-gradient(180deg, ${red}, #5e0d10)`,
-    border: `1px solid #6f1015`,
-    color: "#ffd6d6",
-    fontWeight: 700,
-    boxShadow: "0 12px 40px rgba(164,22,26,.35)",
-  },
-
-  content: {
-    position: "relative",
-    zIndex: 2,
-    display: "grid",
-    gridTemplateColumns: "1.15fr 0.85fr",
-    gap: 28,
-    padding: "36px 22px 48px",
-    maxWidth: 1120,
-    margin: "0 auto",
-  },
-
-  left: { color: ink, display: "flex", flexDirection: "column", gap: 14 },
-
-  crestWrap: {
-    width: 96, height: 96, borderRadius: 18,
-    background: "rgba(212,175,55,.08)",
-    display: "grid", placeItems: "center",
-    border: "1px solid rgba(212,175,55,.25)",
-    boxShadow: "0 10px 40px rgba(0,0,0,.6)"
-  },
-  crest: { filter: "drop-shadow(0 0 8px rgba(212,175,55,.25))" },
-  title: { fontSize: 36, margin: "6px 0 6px", letterSpacing: 0.5, color: ink, fontWeight: 800 },
-  gold: { color: gold },
-  lore: { color: "#ddd", lineHeight: 1.6, opacity: 0.92 },
-
-  panel: {
-    background: panel,
-    border: `1px solid ${goldDim}33`,
-    borderRadius: 14,
-    padding: 14,
-    boxShadow: "0 12px 40px rgba(0,0,0,.5)"
-  },
-  panelHead: { color: gold, fontWeight: 800, marginBottom: 8, letterSpacing: 0.5 },
-
-  rosterList: { listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 },
-  rosterItem: { display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "rgba(255,255,255,0.02)", borderRadius: 8, border: "1px solid rgba(255,255,255,.05)" },
-  badge: { background: `linear-gradient(180deg, ${gold}, ${goldDim})`, color: "#111", padding: "2px 8px", borderRadius: 999, fontWeight: 800, fontSize: 13 },
-  tag: { color: "#a2a2a2", fontSize: 12 },
-  status: { color: "#fff", padding: "2px 8px", borderRadius: 999, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
-  note: { marginTop: 8, color: "#a6a6a6", fontSize: 12 },
-
-  oath: {
-    marginTop: 12,
-    display: "grid",
-    gridTemplateColumns: "auto 1fr",
-    gap: 12,
-    alignItems: "center",
-    padding: "12px 12px",
-    background: "rgba(212,175,55,.05)",
-    border: `1px solid ${goldDim}33`,
-    borderRadius: 12
-  },
-  oathHead: { color: gold, fontWeight: 800, marginBottom: 2, letterSpacing: .4 },
-  oathText: { color: "#d3d3d3" },
-
-  card: {
-    background: panel,
-    borderRadius: 16,
-    border: `1px solid ${goldDim}33`,
-    padding: 18,
-    color: ink,
-    boxShadow: "0 22px 54px rgba(0,0,0,.65)",
-    alignSelf: "start"
-  },
-  cardHead: { display: "flex", alignItems: "center", gap: 8, fontWeight: 800, color: gold, letterSpacing: 0.6 },
-  dotLive: { width: 10, height: 10, borderRadius: 999, background: "#1a7f37", boxShadow: "0 0 10px rgba(26,127,55,.8)" },
-
-  label: { display: "block", fontSize: 12, color: "#c9c9c9", marginTop: 10, marginBottom: 6 },
-  input: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    background: "#0f0f0f",
-    border: "1px solid #2a2a2a",
-    color: ink,
-    outline: "none"
-  },
-  btn: {
-    width: "100%", marginTop: 14, padding: "10px 12px",
-    borderRadius: 10, border: "1px solid #5c4616",
-    background: `linear-gradient(180deg, ${gold}, ${goldDim})`,
-    color: "#111", fontWeight: 900, letterSpacing: 0.4, cursor: "pointer"
-  },
-  err: { marginTop: 12, background: "#220000", border: `1px solid ${red}`, color: "#ffd6d6", padding: "8px 10px", borderRadius: 10 },
-  smallPrint: { marginTop: 12, color: "#a0a0a0", fontSize: 12, opacity: 0.85 },
-
-  "@media(sm)": {}
+  page: { position: "relative", minHeight: "100vh", background: "#000", overflow: "hidden" }
 };
