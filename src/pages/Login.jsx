@@ -1,24 +1,21 @@
-import React, { useMemo } from "react";
-
-/**
- * Forge of Valhalla — Login (mobile-first)
- * - Background: public/valhalla-hall.jpg (full-bleed, covered, darkened)
- * - Momma Joe banner with gold↔deep-red forge glow
- * - Lore intro
- * - Shield Wall (nicknames only; PattyCake & DumbAssRedneck switched)
- * - Oath panel
- * - Sign-in form pinned to bottom; NO sign-up
- */
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supa } from "../lib/supa";
 
 const WALL = [
-  { handle: "DumbAssRedneck" }, // (Patrick)
-  { handle: "PattyCake" },      // (Taz)
-  { handle: "Joker" },          // (Tyler)
-  { handle: "DoubleD" },        // (Dalton)
+  { handle: "DumbAssRedneck" },
+  { handle: "PattyCake" },
+  { handle: "Joker" },
+  { handle: "DoubleD" },
 ];
 
 export default function Login() {
-  // simple daily “path” line tied to date (stable per 24h)
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
   const pathLine = useMemo(() => {
     const paths = [
       "A golden path burns through the frost.",
@@ -32,21 +29,32 @@ export default function Login() {
     return paths[day % paths.length];
   }, []);
 
+  async function handleLogin(e) {
+    e.preventDefault();
+    setErr("");
+    if (!email || !pass) { setErr("Enter email and password."); return; }
+    try {
+      setBusy(true);
+      const { error } = await supa.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+      nav("/", { replace: true });
+    } catch (ex) {
+      setErr(ex?.message || "Login failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="valhalla-wrap">
-      {/* background image + dark vignette */}
       <div className="vh-bg" />
       <div className="vh-vignette" />
-
-      {/* top “Momma Joe” banner */}
       <div className="vh-banner">
         <span className="vh-crown" aria-hidden>👑</span>
         <span className="vh-banner-text">
           Guided by <strong>Momma Joe</strong> — may his counsel steady the hand.
         </span>
       </div>
-
-      {/* content column */}
       <main className="vh-main">
         <header className="vh-hero">
           <div className="vh-mark" aria-hidden />
@@ -60,8 +68,6 @@ export default function Login() {
           </p>
           <p className="vh-path">{pathLine}</p>
         </header>
-
-        {/* Shield Wall */}
         <section className="vh-card vh-wall">
           <h2 className="vh-h2">Shield Wall</h2>
           <div className="vh-wall-grid">
@@ -78,8 +84,6 @@ export default function Login() {
           </div>
           <p className="vh-note">New warriors are invited by the Jarl only. No sign-ups.</p>
         </section>
-
-        {/* Oath */}
         <section className="vh-card vh-oath">
           <h3 className="vh-h3">Oath of the Forge</h3>
           <div className="vh-oath-body">
@@ -92,23 +96,28 @@ export default function Login() {
           </div>
         </section>
       </main>
-
-      {/* Sign-in: pinned low; no sign-up */}
-      <form className="vh-login" onSubmit={(e) => e.preventDefault()}>
+      <form className="vh-login" onSubmit={handleLogin}>
         <h4 className="vh-login-title">Sign in</h4>
+        {err && <div className="vh-err">{err}</div>}
         <input
           type="email"
           placeholder="you@email.com"
           className="vh-input"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           autoComplete="username"
         />
         <input
           type="password"
           placeholder="Password"
           className="vh-input"
+          value={pass}
+          onChange={e => setPass(e.target.value)}
           autoComplete="current-password"
         />
-        <button type="submit" className="vh-btn">Enter the Hall</button>
+        <button type="submit" className="vh-btn" disabled={busy}>
+          {busy ? "Entering…" : "Enter the Hall"}
+        </button>
       </form>
     </div>
   );
