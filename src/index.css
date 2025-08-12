@@ -442,3 +442,29 @@ body { accent-color: var(--gold); }
 .btn.tiny.danger{border-color:#5a1d1d}
 .adder select{background:#141414;border:1px solid #333;border-radius:10px;padding:8px 10px;color:#ddd;margin-top:6px}
 @media (max-width:640px){ .chart-box{height:240px} }
+
+/* FoV focus chart */
+.focus-wrap{ display:grid; gap:16px; }
+.focus-bar{ background:linear-gradient(180deg,#0f0f0f,#0b0b0b); border:1px solid rgba(212,175,55,.18); border-radius:14px; padding:12px; }
+.focus-row{ display:flex; gap:12px; align-items:center; justify-content:space-between; }
+.focus-row select{ background:#121212; color:#ddd; border:1px solid #2a2a2a; border-radius:8px; padding:8px 10px; }
+.toggle{ display:flex; align-items:center; gap:8px; color:#d4af37; font-weight:600; }
+.toggle input{ display:none; }
+.toggle span{ width:42px; height:24px; background:#222; border:1px solid #555; border-radius:999px; position:relative; display:inline-block; vertical-align:middle; }
+.toggle span::after{ content:""; width:18px; height:18px; background:#888; position:absolute; top:2px; left:2px; border-radius:50%; transition:.2s; }
+.toggle input:checked + span{ background:#3a0c0c; border-color:#6b1b1b; }
+.toggle input:checked + span::after{ left:22px; background:#d4af37; }
+
+.watchline{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.chip{ display:flex; align-items:center; gap:6px; background:#101010; border:1px solid #2a2a2a; border-radius:999px; padding:4px 6px; }
+.chip.active{ border-color: rgba(212,175,55,.55); box-shadow:0 0 0 2px rgba(212,175,55,.12) inset; }
+.chip button{ color:#ddd; background:transparent; border:0; font-weight:700; }
+.chip-tools b{ cursor:pointer; opacity:.65; padding:0 4px; }
+.chip-add{ background:#121212; color:#ccc; border:1px solid #2a2a2a; border-radius:999px; padding:4px 8px; }
+
+.chart-card{ background: radial-gradient(140% 120% at 50% 0%, rgba(16,16,16,.78) 0%, rgba(12,12,12,.70) 60%, rgba(10,10,10,.62) 100%); border:1px solid rgba(212,175,55,.18); border-radius:14px; padding:8px 8px 0 8px; }
+.chart-head{ display:flex; justify-content:space-between; align-items:center; padding:6px 6px 10px 6px; }
+.chart-head .title{ font-weight:800; color:#d4af37; }
+.chart-head .err{ color:#ffd6d6; background:#220000; border:1px solid #a4161a; border-radius:8px; padding:2px 6px; font-size:12px; }
+.chart-wrap{ width:100%; height:56vh; min-height:360px; }
+@media (min-width:900px){ .chart-wrap{ height:65vh; } }

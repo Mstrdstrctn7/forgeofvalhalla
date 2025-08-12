@@ -1,3 +1,4 @@
+import CoinFocus from "../components/CoinFocus";
 import FocusCoin from "../components/FocusCoin";
 import React, { useEffect, useState } from 'react'
 
