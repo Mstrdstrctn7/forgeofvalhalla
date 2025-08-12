@@ -1,83 +1,63 @@
+/* ===== Forge of Valhalla — Dark Gold & Deep Red UI ===== */
 :root{
-  --bg:#0b0b0b; --panel:#141414; --muted:#9aa0a6; --text:#e5e7eb;
-  --accent:#7dd3fc; --accent-2:#38bdf8; --danger:#ef4444; --ok:#22c55e;
-  --ring:#2a2a2a; --border:#1f2937;
-  --radius:12px;
-  --font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  --bg:#0a0a0a; --panel:#111; --panel-2:#1a1a1a;
+  --text:#f5f2e8; --muted:#b3a889; --border:#2a2a2a; --ring:#3a2f1b;
+  --accent:#d4af37; --accent-2:#b8860b;
+  --ok:#c6af65; --warn:#ffbf00; --err:#8b0000; --err-light:#b22222;
+  --r-xs:8px; --r-sm:10px; --r-md:12px; --r-lg:16px;
+  --shadow:0 1px 0 rgba(255,215,0,.05) inset,0 6px 24px rgba(0,0,0,.35);
+  --font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  --h1:28px; --h2:20px;
 }
-
 *{box-sizing:border-box}
-html,body,#root{height:100%;}
-body{
-  margin:0; background:var(--bg); color:var(--text); font:var(--font);
-  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+html,body,#root{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:var(--font);-webkit-font-smoothing:antialiased}
+h1{font-size:var(--h1);font-weight:800;letter-spacing:.3px;margin-bottom:12px;color:var(--accent)}
+h2{font-size:var(--h2);font-weight:700;margin:12px 0;color:var(--accent-2)}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+
+/* Header */
+.header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(212,175,55,.05),rgba(0,0,0,0));position:sticky;top:0;z-index:50;backdrop-filter:blur(6px)}
+.container{max-width:1040px;margin:0 auto;padding:16px}
+
+/* Panels */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
+.card + .card{margin-top:14px}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+
+/* Inputs */
+.input,input[type=text],input[type=email],input[type=password],select{
+  height:38px;padding:0 12px;color:var(--text);background:var(--panel-2);
+  border:1px solid var(--ring);border-radius:var(--r-sm)
 }
+input::placeholder{color:var(--muted)}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(212,175,55,.2)}
 
-a{color:var(--accent-2); text-decoration:none}
-a:hover{text-decoration:underline}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;height:38px;padding:0 14px;border:1px solid var(--ring);
+  background:var(--panel-2);color:var(--text);border-radius:var(--r-sm);cursor:pointer;transition:background .15s ease}
+.btn:hover{background:#1f1f1f}
+.btn.primary{background:var(--accent);color:#000;border-color:var(--accent-2)}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.danger{background:var(--err);border-color:var(--err-light)}
+.btn.danger:hover{background:var(--err-light)}
 
-.container{
-  max-width: 980px; margin: 0 auto; padding: 16px;
-}
+/* Badges / status */
+.badge{display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;background:var(--panel-2);
+  border:1px solid var(--ring);color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:999px}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--err)}
 
-h1{font-size:28px; font-weight:800; margin:0 0 12px}
-h2{font-size:20px; font-weight:700; margin:12px 0}
+/* Table */
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--panel);box-shadow:var(--shadow)}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:12px 10px;border-bottom:1px solid var(--border)}
+.table th{text-align:left;color:var(--accent);background:#141414;font-weight:600}
+.table tr:hover td{background:rgba(139,0,0,.15)}
+.table .num{text-align:right;font-variant-numeric:tabular-nums}
 
-.header{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:16px; border-bottom:1px solid var(--ring);
-}
-
-.btn{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:8px 12px; border:1px solid var(--border); border-radius:10px;
-  background:#0f172a; color:#e5e7eb; cursor:pointer;
-}
-.btn:hover{background:#111827}
-.btn.danger{border-color:#4b1010; background:#250d0d; color:#ffd3d3}
-.btn.ok{border-color:#0e3a22; background:#0b2619}
-
-.input, .select{
-  height:36px; padding:0 10px; color:var(--text); background:#0f1115;
-  border:1px solid var(--ring); border-radius:10px; outline:none;
-}
-.input::placeholder{color:#6b7280}
-.select{appearance:none}
-
-.toolbar{
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;
-}
-
-.card{
-  background:var(--panel); border:1px solid var(--ring);
-  border-radius:var(--radius); padding:14px;
-}
-
-.table{width:100%; border-collapse:collapse; font-size:14px}
-.table th, .table td{padding:10px 8px; border-bottom:1px solid var(--ring)}
-.table th{color:#cbd5e1; font-weight:600; text-align:left}
-.table tr:hover td{background:#101217}
-
-.badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; border:1px solid var(--ring);}
-.badge.dot{gap:8px}
-.dot{width:8px; height:8px; border-radius:999px; background:#9ca3af}
-.dot.ok{background:var(--ok)} .dot.err{background:var(--danger)} .dot.warn{background:#f59e0b}
-
-.right{margin-left:auto}
-
-footer{opacity:.6; padding:20px 0; text-align:center}
-
-/* Make default form elements look sane on mobile */
-input[type="text"], input[type="email"], input[type="password"]{
-  width:100%;
-}
-
-/* Small helpers for our components without changing their code */
-main{padding:16px}
-.search{flex:1; min-width:160px}
-
-/* Fix tiny default text on some Android/Chrome combos */
-@media (max-width:420px){
-  :root{ --font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial}
-  .toolbar{gap:8px}
-}
+/* Footer */
+footer{opacity:.65;padding:24px 0;text-align:center;font-size:13px}

@@ -1,15 +1,19 @@
+import React from "react";
 import { supa } from "../lib/supa";
 
-export default function Header() {
+export default function Header(){
+  const onSignOut = async () => {
+    try{ await supa.auth.signOut(); }catch(_){}
+    try{ window.location.href = "/login"; }catch(_){}
+  };
   return (
-    <header className="w-full flex items-center justify-between p-3 border-b border-zinc-800">
-      <h1 className="text-lg font-semibold">Forge of Valhalla</h1>
-      <button
-        onClick={async () => { await supa.auth.signOut(); location.href = "/login"; }}
-        className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
-      >
-        Sign out
-      </button>
+    <header className="header">
+      <div style={{display:"flex",gap:10,alignItems:"baseline"}}>
+        <h1 style={{margin:0}}>Forge of Valhalla</h1>
+      </div>
+      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+        <button className="btn danger" onClick={onSignOut}>Sign out</button>
+      </div>
     </header>
   );
 }

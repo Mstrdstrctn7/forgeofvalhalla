@@ -10,13 +10,13 @@ function Home(){
   return (
     <>
       <Header />
-      <main style={{padding:16}}>
+      <div className="container"><main style={{padding:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <h2 style={{fontSize:18,fontWeight:700}}>Dashboard</h2>
           <TradingStatus />
         </div>
         <CoinTable />
-      </main>
+      </main></div>
     </>
   );
 }
