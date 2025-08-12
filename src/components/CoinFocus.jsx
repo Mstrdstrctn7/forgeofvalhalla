@@ -1,206 +1,326 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAdaptivePoll } from "../lib/useAdaptivePoll";
 
-const TFMS = [["1m",60],["5m",300],["1h",3600],["1d",86400]];
-const COINS = ["BTC/USD","ETH/USD","XRP/USD","SOL/USD","ADA/USD","DOGE/USD"];
-const baseFuncs = import.meta.env.VITE_FUNCS || "/.netlify/functions";
+// ---------------------------------------------
+// Config
+// ---------------------------------------------
+const FUNCS = import.meta.env.VITE_FUNCS || "/.netlify/functions";
+const WS_FUNCS = import.meta.env.VITE_WS_FUNCS || ""; // optional websocket base (wss://...)
 
-/* Fallback data so the UI never looks empty if functions hiccup */
-function genFallbackCandles(n=240, start=48000){
-  const out=[]; let p=start;
-  for(let i=0;i<n;i++){
-    const drift = (Math.random()-0.5)*0.008 * p;
-    const open  = p;
-    const high  = open + Math.abs(drift)*1.4;
-    const low   = open - Math.abs(drift)*1.4;
-    const close = open + drift;
-    out.push({t: i, o:+open.toFixed(2), h:+high.toFixed(2), l:+low.toFixed(2), c:+close.toFixed(2)});
-    p = close;
-  }
-  return out;
+// pairs to choose from (you can expand later)
+const PAIRS = [
+  "BTC/USD","ETH/USD","XRP/USD","BNB/USD","SOL/USD","ADA/USD","DOGE/USD","AVAX/USD","LINK/USD","TON/USD"
+];
+
+// TF options (must match your server)
+const TFS = [
+  { k: "1m",  label: "1m"  },
+  { k: "5m",  label: "5m"  },
+  { k: "1h",  label: "1h"  },
+  { k: "1d",  label: "1d"  },
+];
+
+// KnightRider daily pick (deterministic)
+function knightPick(list){
+  const d = new Date();
+  const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++){ h ^= key.charCodeAt(i); h = (h * 16777619) >>> 0; }
+  return list[h % list.length];
 }
 
-async function fetchCandles(symbol, tfSec){
-  const qs = new URLSearchParams({ symbol: symbol.replace("/","_"), tf: String(tfSec) });
-  const url = `${baseFuncs}/candles?${qs}`;
-  try{
-    const res = await fetch(url, {cache:"no-store"});
-    const ctype = res.headers.get("content-type") || "";
-    if(!res.ok || !ctype.includes("json")) throw new Error(`Bad response ${res.status}`);
-    const rows = await res.json();
-    if(!Array.isArray(rows) || rows.length===0) throw new Error("Empty");
-    return rows.map(r => ({ t:+r.t, o:+r.o, h:+r.h, l:+r.l, c:+r.c })).slice(-800);
-  }catch(e){
-    console.warn("⚠️ candles fallback:", e?.message || e);
-    const seed = symbol.startsWith("BTC") ? 60000 : 4000;
-    return genFallbackCandles(360, seed);
-  }
-}
-
-function useCandles(symbol, tfSec){
-  const [data,setData]   = useState([]);
-  const [price,setPrice] = useState(0);
-  const [loading,setLoading] = useState(true);
-
-  const load = async () => {
-    const rows = await fetchCandles(symbol, tfSec);
-    setData(rows);
-    setPrice(rows.at(-1)?.c ?? 0);
-    setLoading(false);
-  };
-
-  useEffect(()=>{ setLoading(true); load(); }, [symbol, tfSec]);
-  useEffect(()=>{ const id=setInterval(load, 15_000); return ()=>clearInterval(id); }, [symbol, tfSec]);
-
-  return {data,price,loading};
-}
-
-/* Lightweight canvas candlestick renderer */
-function drawCandleChart(canvas, rows){
-  const W = canvas.width, H = canvas.height;
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0,0,W,H);
-
-  if(!rows?.length){ ctx.fillStyle="#777"; ctx.font="14px system-ui"; ctx.fillText("No candle data", 12, 22); return; }
-
-  const pad=8, top=10, bot=16;
-  const vw = W-2*pad, vh = H-top-bot;
-  const lows = rows.map(r=>r.l), highs=rows.map(r=>r.h);
-  const minL = Math.min(...lows), maxH=Math.max(...highs);
-  const x = i => pad + (i/(rows.length-1))*vw;
-  const y = v => top + (1-(v-minL)/(maxH-minL))*vh;
-
-  // grid
-  ctx.strokeStyle="rgba(255,215,130,.08)";
-  ctx.lineWidth=1;
-  ctx.beginPath();
-  for(let i=0;i<=4;i++){ const gy=top + (i/4)*vh; ctx.moveTo(pad,gy); ctx.lineTo(pad+vw,gy); }
-  ctx.stroke();
-
-  // candles
-  const bw = Math.max(1, Math.floor(vw/rows.length)-1);
-  rows.forEach((r,i)=>{
-    const cx = x(i);
-    const up = r.c >= r.o;
-    ctx.strokeStyle = up ? "rgba(212,175,55,.90)" : "rgba(164,22,26,.90)";
-    ctx.fillStyle   = up ? "rgba(212,175,55,.30)" : "rgba(164,22,26,.30)";
-    ctx.beginPath(); ctx.moveTo(cx, y(r.h)); ctx.lineTo(cx, y(r.l)); ctx.stroke();
-    const bh = Math.abs(y(r.c)-y(r.o));
-    const topY = Math.min(y(r.c), y(r.o));
-    ctx.fillRect(cx - bw/2, topY, bw, Math.max(1,bh));
-    ctx.strokeRect(cx - bw/2, topY, bw, Math.max(1,bh));
+function useLocalStore(key, initial){
+  const [val, setVal] = useState(()=>{
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : initial;
+    }catch{ return initial; }
   });
+  useEffect(()=>{ try{ localStorage.setItem(key, JSON.stringify(val)); }catch{} },[key,val]);
+  return [val, setVal];
 }
 
-export default function CoinFocus(){
-  const [market] = useState("USDT");
-  const [symbol,setSymbol] = useState("BTC/USD");
-  const [tf,setTf] = useState(TFMS[0][1]);
+// ---------------------------------------------
+// Simple canvas candle renderer (contained)
+// ---------------------------------------------
+function drawCandles(canvas, candles, cursorIdx){
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.clientWidth;
+  const H = canvas.clientHeight;
+  // handle DPR crispness
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  ctx.scale(dpr, dpr);
 
-  const {data,price,loading} = useCandles(symbol, tf);
+  // bg
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = "rgba(0,0,0,0)";
+  ctx.fillRect(0,0,W,H);
 
-  const pointsPerView = 120;                   // visible candle window
-  const [offset,setOffset] = useState(0);      // 0 = live edge; higher = look further back
-  const prevLenRef = useRef(0);
+  if (!candles?.length) {
+    ctx.fillStyle = "#888";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillText("No candle data", 10, 16);
+    return;
+  }
 
-  // Keep historical window pinned if user is scrubbing (offset>0) while new data arrives
+  // windowed view (use all)
+  const view = candles;
+  const n = view.length;
+  const xs = 10, xe = W - 10, ys = 8, ye = H - 50;
+  const cw = Math.max(1, (xe - xs) / Math.max(1, n));  // candle width
+  const high = Math.max(...view.map(c => c.h));
+  const low  = Math.min(...view.map(c => c.l));
+  const scaleY = (v) => ye - ( (v - low) / Math.max(1e-9, (high - low)) ) * (ye - ys);
+
+  // grid lines
+  ctx.strokeStyle = "rgba(255,215,55,0.06)";
+  ctx.lineWidth = 1;
+  for(let i=0;i<=4;i++){
+    const y = ys + (i*(ye-ys)/4);
+    ctx.beginPath(); ctx.moveTo(xs, y); ctx.lineTo(xe, y); ctx.stroke();
+  }
+
+  // draw candles
+  for(let i=0;i<n;i++){
+    const c = view[i];
+    const x = xs + i * cw + cw*0.5;
+
+    // wick
+    ctx.strokeStyle = "rgba(255,215,55,0.45)";
+    ctx.beginPath();
+    ctx.moveTo(x, scaleY(c.h));
+    ctx.lineTo(x, scaleY(c.l));
+    ctx.stroke();
+
+    // body
+    const up = c.c >= c.o;
+    ctx.fillStyle = up ? "rgba(255,235,80,0.85)" : "rgba(220,60,60,0.85)";
+    const y1 = scaleY(c.o);
+    const y2 = scaleY(c.c);
+    const top = Math.min(y1,y2);
+    const h   = Math.max(1, Math.abs(y1 - y2));
+    ctx.fillRect(x - cw*0.35, top, cw*0.7, h);
+  }
+
+  // latest price label (or cursor if scrubbing)
+  const last = typeof cursorIdx === "number" ? view[cursorIdx]?.c : view[n-1]?.c;
+  if (last != null){
+    ctx.fillStyle = "rgba(255,215,55,0.92)";
+    ctx.font = "bold 14px system-ui, sans-serif";
+    ctx.fillText(String(last.toLocaleString()), xs, ys + 14);
+  }
+}
+
+// ---------------------------------------------
+// WebSocket (optional) – merges ticks into the current last candle
+// ---------------------------------------------
+function usePriceStream(enabled, pair, tf, pushTick){
+  const wsRef = useRef(null);
   useEffect(()=>{
-    const prev = prevLenRef.current || 0;
-    const added = Math.max(0, data.length - prev);
-    if(added>0 && offset>0){
-      // advance offset by number of new candles so the viewed window stays at same absolute time
-      setOffset(o => o + added);
+    if(!enabled || !WS_FUNCS) return;
+
+    let url = `${WS_FUNCS.replace(/\/$/,"")}/prices?symbol=${encodeURIComponent(pair)}&tf=${tf}`;
+    try{
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onmessage = (ev)=>{
+        try{
+          // expecting {t,o,h,l,c,v}
+          const tick = JSON.parse(ev.data);
+          pushTick(tick);
+        }catch(_e){}
+      };
+      ws.onerror = ()=>{/* ignore, polling covers it */};
+      ws.onclose = ()=>{/* noop */};
+
+      return () => { try{ ws.close(); }catch{} };
+    }catch(_e){
+      // If the env points somewhere wrong, just ignore; polling keeps working
     }
-    prevLenRef.current = data.length;
-  }, [data, offset]);
+  },[enabled, pair, tf, pushTick]);
+}
 
-  // Clamp offset to available history
-  const maxOffset = Math.max(0, (data?.length||0) - pointsPerView);
-  useEffect(()=>{ if(offset>maxOffset) setOffset(maxOffset); }, [maxOffset]); // keep in range
+// ---------------------------------------------
+// Component
+// ---------------------------------------------
+export default function CoinFocus(){
+  const [pair, setPair] = useState("BTC/USD");
+  const [tf, setTf]     = useState("1m");
+  const [candles, setCandles] = useState([]);
+  const [last, setLast] = useState(0);
+  const [isLive, setIsLive] = useState(true); // paused when scrubbing
+  const [cursor, setCursor] = useState(null); // number index or null for live
+  const [watch, setWatch] = useLocalStore("fov_watch", ["ETH/USD"]);
 
-  const isLive = offset === 0;
+  // KnightRider suggestion
+  const [krOn, setKrOn] = useState(false);
+  const krPick = useMemo(()=> knightPick(PAIRS), []);
 
-  // Windowed slice based on offset
-  const view = useMemo(()=>{
-    const start = Math.max(0, (data.length - pointsPerView) - offset);
-    return data.slice(start, start + pointsPerView);
-  }, [data, offset]);
+  // Add/remove watch
+  const isWatched = watch.includes(pair);
+  const addWatch = ()=> setWatch((w)=> w.includes(pair) ? w : [...w, pair]);
+  const rmWatch  = ()=> setWatch((w)=> w.filter(p => p !== pair));
 
-  // Canvas draw
+  // Polling (HTTP) – adaptive 1s→10s + error backoff
+  useAdaptivePoll(
+    async ({ signal }) => {
+      const limit = 300;
+      const url = `${FUNCS}/candles?symbol=${encodeURIComponent(pair)}&tf=${tf}&limit=${limit}`;
+      const res = await fetch(url, { signal, cache: "no-store" });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();  // [{t,o,h,l,c,v}, ...]
+      setCandles(data);
+      const lastC = data?.[data.length-1]?.c ?? 0;
+      setLast(lastC);
+      if (isLive) setCursor(null);
+      return { t: data?.[data.length-1]?.t, c: lastC };
+    },
+    [pair, tf],
+    {
+      msMin: 1000,      // fastest when prices moving
+      msMax: 10000,     // calm period cap
+      msErrMax: 60000,  // backing off on failures
+      calmStep: 1000,
+      isPaused: () => !isLive,
+    }
+  );
+
+  // Optional WebSocket stream – merges into last candle
+  const pushTick = (tick)=>{
+    if (!tick) return;
+    setCandles((prev)=>{
+      if (!prev?.length) return prev;
+      const next = prev.slice();
+      const i = next.length - 1;
+      const c = next[i];
+      // same bucket -> merge
+      if (tick.t === c.t || Math.abs((tick.t ?? 0) - (c.t ?? 0)) < 1e-6){
+        next[i] = {
+          t: c.t,
+          o: c.o,
+          h: Math.max(c.h, tick.h ?? tick.c ?? c.c),
+          l: Math.min(c.l, tick.l ?? tick.c ?? c.c),
+          c: tick.c ?? c.c,
+          v: (c.v ?? 0) + (tick.v ?? 0)
+        };
+      }else{
+        // new candle started
+        next.push(tick);
+        // keep tail to ~300
+        if (next.length > 300) next.shift();
+      }
+      if (isLive) setCursor(null);
+      setLast(next[next.length-1]?.c ?? 0);
+      return next;
+    });
+  };
+  usePriceStream(true, pair, tf, pushTick);
+
+  // KnightRider daily suggestion auto-switcher
+  useEffect(()=>{
+    if (!krOn) return;
+    setPair(krPick);
+  },[krOn, krPick]);
+
+  // Canvas drawing
   const canvasRef = useRef(null);
   useEffect(()=>{
-    const c = canvasRef.current; if(!c) return;
-    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-    const cssW = c.clientWidth || 360, cssH = c.clientHeight || 260;
-    c.width = cssW * dpr; c.height = cssH * dpr;
-    c.style.width = cssW+"px"; c.style.height = cssH+"px";
-    const ctx = c.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
-    drawCandleChart(c, view);
-  }, [view]);
+    const idx = (cursor == null) ? null : Math.max(0, Math.min(candles.length-1, cursor));
+    drawCandles(canvasRef.current, candles, idx);
+  },[candles, cursor]);
 
-  // KnightRider (optional rotating pick)
-  const [kride, setKride] = useState(false);
-  useEffect(()=>{
-    if(!kride) return;
-    const d = new Date(); const day = Math.floor(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())/86400000);
-    setSymbol(COINS[day % COINS.length]);
-  }, [kride]);
+  const onScrub = (e)=>{
+    const idx = Number(e.target.value);
+    setIsLive(false);
+    setCursor(Number.isFinite(idx) ? idx : null);
+  };
+  const goLive = ()=>{
+    setIsLive(true);
+    setCursor(null);
+  };
+
+  // Helpers
+  const cursorLabel = (cursor==null || !candles.length) ? "Live" : "Past";
+  const maxIdx = Math.max(0, candles.length - 1);
 
   return (
     <section className="focus-shell">
-      <div className="focus-head">
-        <div className="focus-row">
-          <div className="seg">Market: <strong>{market}</strong></div>
-          <div className="seg">
-            <select value={symbol} onChange={e=>{ setSymbol(e.target.value); setOffset(0); }} className="focus-select">
-              {COINS.map(s => <option key={s} value={s}>{s}</option>)}
+      <div className="focus-card card">
+        {/* Controls */}
+        <div className="focus-head" style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, padding:"12px 12px 0"}}>
+          <div className="input-chip">Market: USDT</div>
+          <div className="input-chip">
+            <select
+              value={pair}
+              onChange={(e)=> setPair(e.target.value)}
+              aria-label="Pair"
+              style={{background:"transparent", color:"var(--ink)", border:"none", width:"100%"}}
+            >
+              {PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+
+          <div style={{display:"flex", gap:8, gridColumn:"1 / span 2", marginTop:6}}>
+            {TFS.map(t => (
+              <button key={t.k}
+                onClick={()=> setTf(t.k)}
+                className={`chip ${tf===t.k ? "on":""}`}
+                aria-pressed={tf===t.k}
+              >{t.label}</button>
+            ))}
+            <label className="chip" style={{marginLeft:8}}>
+              <input type="checkbox" checked={krOn} onChange={e=>setKrOn(e.target.checked)} style={{marginRight:8}}/>
+              KnightRider
+            </label>
+          </div>
+
+          <div style={{display:"flex", gap:8, gridColumn:"1 / span 2"}}>
+            {!isWatched
+              ? <button className="btn subtle" onClick={addWatch}>+ Watch</button>
+              : <button className="btn subtle" onClick={rmWatch}>– Unwatch</button>}
+          </div>
         </div>
 
-        <div className="focus-row">
-          <div className="tf">
-            {TFMS.map(([l,s])=>(
-              <button key={l} onClick={()=>{ setTf(s); setOffset(0); }} className={`tf-btn ${tf===s?"on":""}`}>{l}</button>
+        {/* Chart */}
+        <div className="canvas-wrap" style={{margin:"10px 12px 0"}}>
+          <canvas ref={canvasRef} />
+          <div className="go-live" role="status" aria-live="polite" onClick={goLive}>
+            {cursor==null ? "LIVE" : "Go Live"}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="cta-row" style={{display:"flex", gap:12, padding:"12px"}}>
+          <button className="btn buy"  onClick={()=>alert(`Buy ${pair} (stub)`)}>Buy</button>
+          <button className="btn sell" onClick={()=>alert(`Sell ${pair} (stub)`)}>Sell</button>
+          <button className="btn trade" onClick={()=>alert(`Trade ${pair} (stub)`)}>Trade</button>
+        </div>
+
+        {/* Scrubber */}
+        <div className="scrub-row" style={{display:"grid", gridTemplateColumns:"1fr auto", alignItems:"center", gap:12, padding:"0 12px 14px"}}>
+          <input type="range"
+                 min={0}
+                 max={maxIdx}
+                 step={1}
+                 value={cursor==null ? maxIdx : cursor}
+                 onChange={onScrub}
+                 aria-label="History"
+                 />
+          <div className="scrub-label">{cursorLabel}</div>
+        </div>
+
+        {/* Watch pills preview */}
+        {watch?.length ? (
+          <div style={{display:"flex", gap:8, padding:"0 12px 14px", flexWrap:"wrap"}}>
+            {watch.map(w => (
+              <button key={w} className="pill" onClick={()=> setPair(w)}>{w}</button>
             ))}
           </div>
-          <label className="kr">
-            <input type="checkbox" checked={kride} onChange={e=>setKride(e.target.checked)} />
-            KnightRider
-          </label>
-        </div>
-      </div>
-
-      <div className="focus-card focus-shell">
-        <div className="focus-title">
-          <div>{symbol}</div>
-          <div className={`live-dot ${isLive?"on":"off"}`}>{price ? price.toLocaleString() : 0}</div>
-        </div>
-
-        <div className="canvas-wrap">
-          <canvas ref={canvasRef}/>
-          {!isLive && <button className="go-live" onClick={()=>setOffset(0)}>Go Live</button>}
-          {loading && <div className="loading">Loading…</div>}
-        </div>
-
-        <div className="scrub-row">
-          <span className="scrub-label">Recent</span>
-          <input
-            aria-label="History scrubber"
-            type="range"
-            min={0}
-            max={maxOffset}
-            value={Math.min(offset, maxOffset)}
-            onChange={e=>setOffset(Number(e.target.value))}
-          />
-          <span className="scrub-label">Past</span>
-        </div>
-
-        <div className="cta-row">
-          <button className="btn buy">Buy</button>
-          <button className="btn sell">Sell</button>
-          <button className="btn trade">Trade</button>
-        </div>
-        <div className="hint">{isLive ? "Live — updating every ~15s." : "Viewing history — tap Go Live to jump to now."}</div>
+        ) : null}
       </div>
     </section>
   );
