@@ -170,7 +170,7 @@ export default function CoinFocus(){
         </div>
       </div>
 
-      <div className="focus-card">
+      <div className="focus-card focus-shell">
         <div className="focus-title">
           <div>{symbol}</div>
           <div className={`live-dot ${isLive?"on":"off"}`}>{price ? price.toLocaleString() : 0}</div>
