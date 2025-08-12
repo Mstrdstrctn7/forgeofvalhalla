@@ -1,20 +1,22 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supa } from "../lib/supa";
-export default function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const nav = useNavigate();
+import { ReactNode, useEffect, useState } from "react";
+import supa from "../lib/supa";
+
+export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [ok, setOk] = useState(false);
+
   useEffect(() => {
-    let unsub = () => {};
+    let mounted = true;
     (async () => {
-      const { data: { session } } = await supa.auth.getSession();
-      if (!session) { nav("/login", { replace: true }); return; }
+      const { data } = await supa.auth.getSession();
+      if (!mounted) return;
+      setOk(!!data.session);
       setReady(true);
-      const { data: sub } = supa.auth.onAuthStateChange((_e, s) => { if (!s) nav("/login", { replace: true }); });
-      unsub = () => sub.subscription.unsubscribe();
     })();
-    return () => unsub();
-  }, [nav]);
-  if (!ready) return null;
-  return children;
+    return () => { mounted = false; };
+  }, []);
+
+  if (!ready) return <div className="p-6 text-sm opacity-70">Loading…</div>;
+  if (!ok) return <div className="p-6 text-amber-400">Login Required</div>;
+  return <>{children}</>;
 }
