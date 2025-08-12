@@ -1,3 +1,4 @@
+import FocusCoin from "../components/FocusCoin";
 import React, { useEffect, useState } from 'react'
 
 export default function Dashboard() {
