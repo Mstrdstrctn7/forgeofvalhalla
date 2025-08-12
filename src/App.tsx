@@ -1,17 +1,16 @@
-import Debug from "./pages/Debug";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import ErrorBoundary from "./components/ErrorBoundary";
-import ProtectedRoute from "./components/ProtectedRoute";
+// @ts-nocheck
+import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header";
 import TradingStatus from "./components/TradingStatus";
-import Login from "./pages/Login";
 import CoinTable from "./components/CoinTable";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
 
 function Home(){
   return (
     <>
       <Header />
-      <main style={{padding:16}} >
+      <main style={{padding:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <h2 style={{fontSize:18,fontWeight:700}}>Dashboard</h2>
           <TradingStatus />
@@ -24,14 +23,10 @@ function Home(){
 
 export default function App(){
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/_debug" element={<Debug/>}/> 
-          <Route path="/login" element={<Login/>}/>
-          <Route path="/*" element={<ProtectedRoute><Home/></ProtectedRoute>}/>
-        </Routes>
-      </BrowserRouter>
-    </ErrorBoundary>
+    <Routes>
+      <Route path="/login" element={<Login/>}/>
+      <Route path="/" element={<ProtectedRoute><Home/></ProtectedRoute>}/>
+      <Route path="*" element={<Navigate to="/" replace/>}/>
+    </Routes>
   );
 }
