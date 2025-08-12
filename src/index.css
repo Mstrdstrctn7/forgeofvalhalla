@@ -61,3 +61,30 @@ input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(21
 
 /* Footer */
 footer{opacity:.65;padding:24px 0;text-align:center;font-size:13px}
+
+/* --- Watch3 layout --- */
+.watch3-grid{
+  display:grid;
+  gap:12px;
+  grid-template-columns: repeat(1, minmax(0,1fr));
+}
+@media (min-width:720px){
+  .watch3-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+.watch3-item{
+  background: var(--panel, #0b0b0b);
+  border: 1px solid rgba(212,175,55,.22);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.35);
+}
+.watch3-price{
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gold, #d4af37);
+  margin: 6px 0 2px;
+}
+.watch3-meta{
+  display:flex; flex-wrap:wrap; gap:8px;
+  font-size:12px; opacity:.9;
+}

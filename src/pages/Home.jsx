@@ -1,3 +1,4 @@
+import Watch3 from "../components/Watch3";
 export default function Home() {
   return (
     <div style={{padding:16}}>
