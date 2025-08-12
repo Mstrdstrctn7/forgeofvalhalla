@@ -1,32 +1,22 @@
-exports.handler = async (event) => {
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Content-Type": "application/json; charset=utf-8",
-  };
+export default async (req, res) => {
   try {
-    const url = new URL(event.rawUrl || ("https://x/?" + event.rawQuery));
-    const symbol = (url.searchParams.get("symbol") || "BTC_USD").toUpperCase();
-    const interval = url.searchParams.get("interval") || "1m";
-    // Map FOV symbol "BTC_USD" -> Binance "BTCUSDT"
-    const base = symbol.replace(/_USD$/, "");
-    const binanceSymbol = base + "USDT";
-
-    const limit = Math.min(parseInt(url.searchParams.get("limit")||"300",10), 1000);
-    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=${interval}&limit=${limit}`);
-    if (!res.ok) throw new Error(`Upstream ${res.status}`);
-    const rows = await res.json();
-
-    // Binance kline fields: [ openTime, open, high, low, close, volume, closeTime, ... ]
-    const candles = rows.map(r => ({
-      time: Math.floor(r[0]/1000),
-      open: Number(r[1]),
-      high: Number(r[2]),
-      low:  Number(r[3]),
-      close:Number(r[4]),
+    const url = new URL(req.url, "http://x");
+    const sym = (url.searchParams.get("symbol") || "BTC_USD").toUpperCase();
+    const tf  = (url.searchParams.get("tf") || "1m");
+    const lim = Math.min(500, parseInt(url.searchParams.get("limit")||"180",10));
+    const binance = sym.replace("_USD","USDT").replace("_",""); // BTC_USD -> BTCUSDT
+    const api = `https://api.binance.com/api/v3/klines?symbol=${binance}&interval=${tf}&limit=${lim}`;
+    const r = await fetch(api, { headers: { "User-Agent":"FoV/1.0" }});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const rows = await r.json();
+    // Return compact objects [{t,o,h,l,c,v}]
+    const out = rows.map(k => ({
+      t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5]
     }));
-
-    return { statusCode: 200, headers, body: JSON.stringify({symbol, interval, candles}) };
+    res.setHeader("content-type","application/json");
+    res.end(JSON.stringify(out));
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({error: String(e.message||e)}) };
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: String(e.message || e) }));
   }
 };
