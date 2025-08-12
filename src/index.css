@@ -233,3 +233,106 @@ html, body, #root { background: var(--bg); color: var(--ink); }
 
 /* tiny helper */
 .text-dim{ color: var(--ink-dim); }
+
+/* FoV polish pass v2 */
+:root{
+  --gold:#d4af37; --gold-2:#b0892f; --gold-3:#8a6c23;
+  --ink:#e8e8e8; --ink-dim:#cfcfcf; --ink-faint:#b6b6b6;
+  --bg:#0a0a0a; --panel:#0e0e0e; --line:#1d1d1d;
+  --ok:#1d7f4f; --res:#7f2a34;
+}
+
+/* Global rhythm & safe area */
+html, body, #root { background:var(--bg); color:var(--ink); }
+body { accent-color: var(--gold); }
+.fov-login { position:relative; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+/* Subtle grain + vignette over the hero bg (depth) */
+.fov-login::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(120% 80% at 50% 20%, rgba(0,0,0,0) 0%, rgba(0,0,0,.25) 55%, rgba(0,0,0,.65) 100%),
+    url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAQAAADZfx7YAAAAD0lEQVQYV2NgYGBgYGBgYQAAAwkAB6zq8okAAAAASUVORK5CYII=") repeat;
+  opacity:.35;
+}
+
+/* Card rim & divider accents */
+.fov-card{
+  background: rgba(12,12,12,.72);
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow:
+    0 10px 28px rgba(0,0,0,.45),
+    inset 0 0 0 1px rgba(212,175,55,.10);
+}
+.fov-section-title{
+  display:flex; align-items:center; gap:10px;
+  color:var(--gold); font-weight:900; letter-spacing:.2px;
+}
+.fov-section-title::after{
+  content:""; flex:1 1 auto; height:1px; opacity:.35;
+  background: linear-gradient(90deg, rgba(212,175,55,.35), rgba(212,175,55,0));
+}
+
+/* Hero type scale & spacing */
+.fov-title{ margin:2px 0 8px; line-height:1.1; }
+.fov-lead{ color:var(--ink); opacity:.96; }
+
+/* Shield Wall: tighter, clearer badges */
+.fov-shield{ gap:12px; }
+.fov-slot{
+  border:1px solid var(--line);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+}
+.fov-slot strong{ letter-spacing:.2px; }
+.badge{ box-shadow: inset 0 -1px 0 rgba(255,255,255,.12); }
+.badge.ok{ background: linear-gradient(#154f33,#103c27); }
+.badge.res{ background: linear-gradient(#4b151b,#361017); }
+
+/* Oath: improve readability and spacing */
+.fov-oath{ row-gap:12px; }
+.fov-runes{ letter-spacing:.32em; font-size:15px; opacity:.95; }
+.fov-oath ul li{ margin: 6px 0; color:var(--ink); }
+
+/* Momma Joe banner: bolder glow pulse */
+.mj-banner{
+  border:1px solid rgba(212,175,55,.18);
+  box-shadow:
+    0 0 30px rgba(212,175,55,.18),
+    inset 0 0 28px rgba(160,10,10,.18);
+  animation: mjGlow 2.8s ease-in-out infinite alternate;
+}
+@keyframes mjGlow{
+  from{ box-shadow:0 0 18px rgba(212,175,55,.10), inset 0 0 14px rgba(160,10,10,.10); }
+  to  { box-shadow:0 0 40px rgba(212,175,55,.30), inset 0 0 36px rgba(160,10,10,.26); }
+}
+
+/* Auth bar pinned bottom: aligned controls */
+.fov-auth{ z-index:2; }
+.fov-auth .panel{
+  border:1px solid rgba(212,175,55,.18);
+  box-shadow: 0 -10px 30px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.04);
+}
+.fov-auth label{ color:var(--ink-faint); }
+.fov-auth input{
+  border:1px solid #2b2b2b; outline:none;
+}
+.fov-auth input:focus{
+  border-color: rgba(212,175,55,.45);
+  box-shadow: 0 0 0 3px rgba(212,175,55,.15);
+}
+
+/* Button row: password + button aligned */
+.fov-auth .row{
+  grid-template-columns: 1fr minmax(150px, 180px);
+  align-items:end;
+}
+.fov-auth .btn{
+  height:42px;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 60%, var(--gold-3) 100%);
+  color:#111; letter-spacing:.2px;
+  transition: transform .04s ease-out, filter .2s;
+}
+.fov-auth .btn:hover{ filter: brightness(1.06); }
+.fov-auth .btn:active{ transform: translateY(1px); }
+
