@@ -1,7 +1,6 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { background: #000; color: #fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-a { color: #7dd3fc; text-decoration: none; }
-button { cursor: pointer; }
-input, button { font: inherit; }
+body { background:#000; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+a { color:#7dd3fc; text-decoration:none; }
+input,button { font: inherit; }

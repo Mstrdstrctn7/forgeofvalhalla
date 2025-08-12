@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import supa from "../lib/supa";
+import { supa } from "../lib/supa";
 export default function Login(){
   const nav=useNavigate();
   const [mode,setMode]=useState<"login"|"signup">("login");
@@ -26,7 +26,7 @@ export default function Login(){
         {err && <p style={{color:"#f87171",fontSize:12,marginBottom:8}}>{err}</p>}
         <button disabled={busy}
           style={{width:"100%",marginBottom:10,padding:"10px 12px",borderRadius:10,background:"#059669",border:"1px solid #0f766e",color:"#fff",opacity: busy ? 0.6 : 1}}>
-          {busy?"Please wait…":(mode==="login"?"Sign in":"Create account")}
+          {busy ? "Please wait…" : (mode==="login"?"Sign in" : "Create account")}
         </button>
         <p style={{fontSize:12,opacity:.8}}>
           {mode==="login" ? <>No account? <button type="button" onClick={()=>setMode("signup")} style={{color:"#7dd3fc",background:"none",border:"none"}}>Sign up</button></>

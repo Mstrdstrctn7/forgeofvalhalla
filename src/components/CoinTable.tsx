@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 type Row={symbol:string,last:string,change?:string,high?:string,low?:string,vol?:string};
 export default function CoinTable(){
-  const [rows,setRows]=useState<Row[]>([]); const [q,setQ]=useState(""); const [quote,setQuote]=useState<"USDT"|"USD"|"ALL">("USDT");
+  const [rows,setRows]=useState<Row[]>([]);
+  const [q,setQ]=useState(""); const [quote,setQuote]=useState<"USDT"|"USD"|"ALL">("USDT");
   const [limit,setLimit]=useState(100); const [err,setErr]=useState<string|undefined>();
-  async function load(){ try{ setErr(undefined);
-      const url=new URL("/.netlify/functions/ticker", location.origin);
-      url.searchParams.set("limit", String(limit));
-      url.searchParams.set("quote", quote);
-      const r=await fetch(url.toString(),{cache:"no-store"});
-      if(!r.ok) throw new Error(String(r.status));
-      setRows(await r.json());
-    }catch(e:any){ setErr(e?.message||"fail"); } }
-  useEffect(()=>{ load(); const id=setInterval(load, 10000); return ()=>clearInterval(id);},[quote,limit]);
+  async function load(){ try{
+    setErr(undefined);
+    const url=new URL("/.netlify/functions/ticker", location.origin);
+    url.searchParams.set("limit", String(limit));
+    url.searchParams.set("quote", quote);
+    const r=await fetch(url.toString(),{cache:"no-store"});
+    if(!r.ok) throw new Error(String(r.status));
+    setRows(await r.json());
+  }catch(e:any){ setErr(e?.message||"fail"); } }
+  useEffect(()=>{ load(); const id=setInterval(load,10000); return ()=>clearInterval(id);},[quote,limit]);
   const data=useMemo(()=>rows.filter(r=>r.symbol.toLowerCase().includes(q.toLowerCase())),[rows,q]);
   return (
     <div style={{padding:16,border:"1px solid #222",borderRadius:16,background:"#0b0b0b"}}>
@@ -21,7 +23,7 @@ export default function CoinTable(){
           <option value="USDT">USDT</option><option value="USD">USD</option><option value="ALL">ALL</option>
         </select>
         <select value={limit} onChange={e=>setLimit(Number(e.target.value))} style={{background:"#111",border:"1px solid #222",color:"#fff",padding:"6px 8px",borderRadius:8}}>
-          <option>50</option><option>100</option><option>200</option>
+          <option>50</option><option selected>100</option><option>200</option>
         </select>
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search (e.g. BTC, ETH)"
           style={{flex:1,background:"#111",border:"1px solid #222",color:"#fff",padding:"8px 10px",borderRadius:10}}/>
