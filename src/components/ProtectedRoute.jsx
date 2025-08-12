@@ -1,17 +1,33 @@
-import { Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import supa from "../lib/supa";
 
-/**
- * Guards a route.
- * - while `loading` is true, show a tiny placeholder
- * - if there's a session, render children
- * - otherwise, send to /login
- */
-export default function ProtectedRoute({ session, loading, children }) {
-  if (loading) {
-    return <p style={{ color: "#fff", padding: 16 }}>Checking session…</p>;
-  }
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
+export default function ProtectedRoute({ children }) {
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let unsub = () => {};
+    (async () => {
+      // initial check
+      const { data: { session } } = await supa.auth.getSession();
+      if (!session) {
+        navigate("/login", { replace: true });
+        setChecking(false);
+        return;
+      }
+      setChecking(false);
+
+      // keep watching auth state
+      const { data: sub } = supa.auth.onAuthStateChange((_evt, sess) => {
+        if (!sess) navigate("/login", { replace: true });
+      });
+      unsub = () => sub.subscription.unsubscribe();
+    })();
+
+    return () => unsub();
+  }, [navigate]);
+
+  if (checking) return null; // or a spinner
   return children;
 }
