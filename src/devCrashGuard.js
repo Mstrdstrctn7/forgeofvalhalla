@@ -1,14 +1,13 @@
-(function () {
-  const box = document.createElement('div');
-  box.id = 'dev-crash-guard';
-  box.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#200;color:#fdd;padding:10px;font:12px/1.4 monospace;white-space:pre-wrap;display:none';
-  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(box));
-  function show(e, type) {
-    const msg = (e && (e.reason?.stack||e.reason?.message||e.stack||e.message||String(e))) || '(no message)';
-    box.textContent = `[${type}] ${msg}`;
-    box.style.display = 'block';
-    console.error(`[${type}]`, e);
+(function(){
+  function banner(kind, err){
+    try{
+      const el = document.createElement("div");
+      el.style.cssText = "background:#200;color:#ffd6d6;padding:6px 10px;font:14px/1.3 system-ui,Arial;position:sticky;top:0;z-index:99999";
+      const msg = (err && (err.message || err.reason || err)) || "(unknown error)";
+      el.textContent = `[${kind}] ${msg}`;
+      document.body.prepend(el);
+    }catch(_){}
   }
-  addEventListener('error', (e) => show(e.error || e, 'error'));
-  addEventListener('unhandledrejection', (e) => show(e, 'unhandledrejection'));
+  window.addEventListener("error", e => { console.error("[window.error]", e.error||e.message||e); banner("window.error", e.error||e.message||e); });
+  window.addEventListener("unhandledrejection", e => { console.error("[unhandledrejection]", e.reason); banner("unhandledrejection", e.reason); });
 })();

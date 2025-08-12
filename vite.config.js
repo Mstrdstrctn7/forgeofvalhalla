@@ -7,7 +7,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/.netlify/functions': {
-        target: 'http://localhost:9998',
+        target: "http://localhost:9998",
         changeOrigin: true,
         secure: false,
       },
