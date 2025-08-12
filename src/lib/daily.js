@@ -1,5 +1,5 @@
 /**
- * Daily rotating copy for FoV (UTC-based, deterministic by day).
+ * Daily rotating copy for FoV (UTC-based).
  * Keys: 'momma' -> string, 'forge' -> string, 'oath' -> string[3]
  */
 const MOMMA = [
@@ -23,16 +23,13 @@ const OATHS = [
   ["Edge before echo.","Work before words.","Beacon before banner."],
   ["Measure before move.","Focus before flair.","Silence before boast."]
 ];
-
-function idx(len){
-  // Deterministic index from UTC date: YYYY-MM-DD -> number
+function idx(n){
   const d = new Date();
   const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
-  let h = 2166136261; // FNV-ish
-  for (let i=0;i<key.length;i++){ h ^= key.charCodeAt(i); h = (h * 16777619) >>> 0; }
-  return h % len;
+  let h = 2166136261;
+  for (let i=0;i<key.length;i++){ h ^= key.charCodeAt(i); h = (h*16777619)>>>0; }
+  return h % n;
 }
-
 export function daily(key){
   switch (key){
     case "momma": return MOMMA[idx(MOMMA.length)];

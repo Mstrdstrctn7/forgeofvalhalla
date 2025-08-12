@@ -352,3 +352,68 @@ body { accent-color: var(--gold); }
   max-width: 68ch;
 }
 .forge-hero .fov-lead + p{ margin-top: 10px; }
+
+/* fov login polish v4 */
+.login-page{max-width:820px;margin:0 auto;}
+.fov-card{
+  background: rgba(10,10,10,.72);
+  border:1px solid rgba(212,175,55,.18);
+  border-radius:16px; padding:16px; color:var(--ink);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.forge-hero{
+  background:
+    radial-gradient(140% 110% at 50% 0%, rgba(16,16,16,.78) 0%, rgba(10,10,10,.62) 60%, rgba(8,8,8,.55) 100%),
+    var(--bg-image, none);
+  backdrop-filter: blur(1.5px);
+}
+.fov-title{font-weight:900; font-size:clamp(26px,6vw,36px); letter-spacing:.3px; margin:0 0 8px}
+.fov-title .gold{color:#d4af37}
+.fov-lead{font-size:clamp(14px,3.7vw,18px); line-height:1.55; opacity:.96; margin:0}
+.fov-h2{font-size:20px; margin:0 0 10px; color:#d4af37;}
+.fov-h3{font-size:18px; margin:0 0 8px; color:#d4af37;}
+.muted{opacity:.85}
+
+/* Momma pill with forge glow */
+.pill{display:flex;align-items:center;gap:10px;border-radius:999px;padding:10px 14px;
+  background: linear-gradient(120deg, rgba(120,0,0,.55), rgba(212,175,55,.22));
+  border:1px solid rgba(212,175,55,.25); color:#f4f4f4;
+  box-shadow: 0 0 0 rgba(212,175,55,0);
+  animation: ember 3.6s ease-in-out infinite;
+}
+.pill .emoji{filter: drop-shadow(0 0 6px rgba(212,175,55,.5))}
+.pill .pill-title{font-weight:800}
+.pill .pill-rest{opacity:.95}
+@keyframes ember{
+  0%,100%{ box-shadow: 0 0 0 rgba(212,175,55,0)}
+  50%{ box-shadow: 0 0 18px rgba(212,175,55,.18)}
+}
+
+/* Shield rows */
+.shield-row{display:flex;justify-content:space-between;align-items:center;
+  background:#111; border:1px solid rgba(212,175,55,.15);
+  border-radius:12px;padding:12px 14px;margin:8px 0; }
+.shield-name{font-weight:800}
+.badge{padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px;}
+.badge.ok{background:#124b2d;color:#d8f8e4;border:1px solid #2c8f5f}
+.badge.hold{background:#3a0e12;color:#ffd6d6;border:1px solid #7a252d}
+
+/* Oath */
+.runes{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  letter-spacing:.35em; color:#d4af37; margin:4px 0 10px}
+.oath{margin:0; padding-left:18px;}
+.oath li{margin:6px 0}
+
+/* Sign in */
+.signin label{display:block;margin:10px 0 6px;opacity:.9}
+.signin input{
+  width:100%; background:#151515; color:#eee; border:1px solid #333; border-radius:10px;
+  padding:12px 12px; outline:none;
+}
+.signin .row{display:flex; gap:10px; align-items:center; margin-top:8px}
+.signin .row input{flex:1}
+.btn.gold{
+  background: linear-gradient(180deg, #d4af37, #9a8031);
+  color:#111; border:1px solid #c49b2a; border-radius:12px; padding:12px 16px; font-weight:800;
+}
+.err{margin-top:10px; color:#ffd6d6; background:#220000; border:1px solid #7a252d; padding:8px 10px; border-radius:10px}
