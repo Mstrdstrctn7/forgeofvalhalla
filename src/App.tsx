@@ -1,3 +1,4 @@
+import Debug from "./pages/Debug";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -26,6 +27,7 @@ export default function App(){
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
+          <Route path="/_debug" element={<Debug/>}/> 
           <Route path="/login" element={<Login/>}/>
           <Route path="/*" element={<ProtectedRoute><Home/></ProtectedRoute>}/>
         </Routes>
