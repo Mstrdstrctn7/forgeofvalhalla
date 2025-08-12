@@ -1,3 +1,4 @@
+import knightPick from "../lib/knight";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAdaptivePoll } from "../lib/useAdaptivePoll";
 
