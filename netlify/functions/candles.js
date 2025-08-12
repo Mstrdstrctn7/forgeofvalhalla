@@ -1,22 +1,54 @@
-export default async (req, res) => {
+/**
+ * GET /.netlify/functions/candles?symbol=BTC_USD&tf=1m&limit=600
+ * Proxies Binance klines and returns [{t,o,h,l,c,v}, ...].
+ * Supports: USDT market (BTC_USD -> BTCUSDT, ETH_USD -> ETHUSDT, etc.)
+ */
+export async function handler(event) {
   try {
-    const url = new URL(req.url, "http://x");
-    const sym = (url.searchParams.get("symbol") || "BTC_USD").toUpperCase();
-    const tf  = (url.searchParams.get("tf") || "1m");
-    const lim = Math.min(500, parseInt(url.searchParams.get("limit")||"180",10));
-    const binance = sym.replace("_USD","USDT").replace("_",""); // BTC_USD -> BTCUSDT
-    const api = `https://api.binance.com/api/v3/klines?symbol=${binance}&interval=${tf}&limit=${lim}`;
-    const r = await fetch(api, { headers: { "User-Agent":"FoV/1.0" }});
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const rows = await r.json();
-    // Return compact objects [{t,o,h,l,c,v}]
-    const out = rows.map(k => ({
-      t: k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5]
+    const qs = new URLSearchParams(event.queryStringParameters || {});
+    const uiSymbol = (qs.get("symbol") || "BTC_USD").toUpperCase();
+    const tf = (qs.get("tf") || "1m").toLowerCase();
+    const limit = Math.min(parseInt(qs.get("limit") || "600", 10), 1000);
+
+    // Map "BTC_USD" -> "BTCUSDT"
+    const [base, quoteUI] = uiSymbol.split("_");
+    const quote = quoteUI === "USD" ? "USDT" : quoteUI;   // normalize USD -> USDT for Binance
+    const binanceSymbol = `${base}${quote}`;
+
+    // Validate timeframe
+    const allowed = new Set(["1m","5m","15m","30m","1h","4h","1d"]);
+    const interval = allowed.has(tf) ? tf : "1m";
+
+    const url = `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=${interval}&limit=${limit}`;
+    const res = await fetch(url, { headers: { "Accept": "application/json" } });
+    if (!res.ok) {
+      return json({ error: `Upstream ${res.status}` }, res.status);
+    }
+    const rows = await res.json(); // [ [openTime,o,h,l,c,v,closeTime,...], ... ]
+
+    const out = rows.map(r => ({
+      t: r[0],                    // openTime (ms)
+      o: Number(r[1]),
+      h: Number(r[2]),
+      l: Number(r[3]),
+      c: Number(r[4]),
+      v: Number(r[5]),
     }));
-    res.setHeader("content-type","application/json");
-    res.end(JSON.stringify(out));
+
+    return json(out, 200);
   } catch (e) {
-    res.statusCode = 500;
-    res.end(JSON.stringify({ error: String(e.message || e) }));
+    return json({ error: e?.message || "server error" }, 502);
   }
-};
+}
+
+function json(body, status = 200) {
+  return {
+    statusCode: status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+    },
+    body: JSON.stringify(body),
+  };
+}
