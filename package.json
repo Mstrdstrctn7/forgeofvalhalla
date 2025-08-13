@@ -9,7 +9,6 @@
     "preview": "vite preview"
     "preview": "vite preview",
     "prebuild": "bash scripts/dupcheck.sh"
-0bdf407 (chore: add duplicate-file check to prebuild so it shows in Netlify logs)
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.54.0",
@@ -25,4 +24,3 @@
   }
 }
 }
-0bdf407 (chore: add duplicate-file check to prebuild so it shows in Netlify logs)
