@@ -12,7 +12,7 @@ createRoot(root).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <BrowserRouter><BrowserRouter><ProdErrorBoundary><ProdErrorBoundary><BrowserRouter><ErrorBoundary><ErrorBoundary><App /></ErrorBoundary></ErrorBoundary></BrowserRouter></ProdErrorBoundary></ProdErrorBoundary></BrowserRouter></BrowserRouter>
+        <BrowserRouter><BrowserRouter><ProdErrorBoundary><ProdErrorBoundary><BrowserRouter><ErrorBoundary><ErrorBoundary><ErrorBoundary><App /></ErrorBoundary></ErrorBoundary></ErrorBoundary></BrowserRouter></ProdErrorBoundary></ProdErrorBoundary></BrowserRouter></BrowserRouter>
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>
