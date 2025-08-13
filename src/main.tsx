@@ -11,7 +11,7 @@ createRoot(root).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <App/>
+        <BrowserRouter><BrowserRouter><App/></BrowserRouter></BrowserRouter>
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>
