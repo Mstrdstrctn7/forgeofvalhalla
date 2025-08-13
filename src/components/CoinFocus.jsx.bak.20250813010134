@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAdaptivePoll } from "../lib/useAdaptivePoll";
-import { useKlinesWs } from "../lib/useKlinesWs";
 
 /**
  * Simple focus block:
