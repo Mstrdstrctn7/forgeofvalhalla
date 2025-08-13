@@ -1,172 +1,130 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useAdaptivePoll } from "../lib/useAdaptivePoll";
-import { useKlinesWs } from "../lib/useKlinesWs";
+import {
+  openCryptoWS,
+  fetchCryptoCandles,
+  fetchCoinbasePrice,
+  tfMap,
+} from "../lib/marketFeeds";
 
-/**
- * Simple focus block:
- * - Select pair + timeframe
- * - Live line / candle chart (line by default)
- * - Live last price
- * - Scrubber (pauses polling while dragging)
- */
-const PAIRS = ["BTC/USD","ETH/USD","XRP/USD","SOL/USD"];
-const TFS   = ["1m","3m","5m","30m","1h","1d"];
+const TFS = ["1m","3m","5m","30m","1h","24h"];
 
 export default function CoinFocus(){
-  const [pair, setPair] = useState(PAIRS[0]);
+  const [pair, setPair] = useState("BTC/USD");
   const [tf, setTf]     = useState("1m");
-  const [mode, setMode] = useState("line"); // "line" | "candle"
-  const [candles, setCandles] = useState([]); // [{t,o,h,l,c,v}]
-  const [lastPrice, setLastPrice] = useState(0);
-  const [scrubPct, setScrubPct] = useState(1);
-  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [candles, setCandles] = useState([]);  // ascending [{t,o,h,l,c,v}]
+  const [last, setLast] = useState(0);
+  const [mode, setMode] = useState("line");    // "line" | "candle"
+  const [pct, setPct]   = useState(1);         // slider 0..1 history window
 
-  // how many candles to request to keep chart smooth
-  const limit = useMemo(() => {
-    switch(tf){
-      case "1m":  return 600;   // ~10h
-      case "3m":  return 600;   // ~30h
-      case "5m":  return 500;   // ~41h
-      case "30m": return 400;   // ~8d
-      case "1h":  return 400;   // ~16d
-      case "1d":  return 365;   // ~1y
-      default:    return 300;
-    }
-  }, [tf]);
-
-  // Poll live data (fast when healthy, backs off on errors).
-  useAdaptivePoll({
-    pair: pair.replace("/","_"),
-    tf,
-    limit,
-    setCandles,
-    setLastPrice,
-    isPaused: isScrubbing, // pause while scrubber engaged
-  });
-
-  // Drawing
-  const canvasRef = useRef(null);
-  const sub = Math.max(5, Math.floor((candles.length || 0) * scrubPct)); // subset size
-
+  // initial history load
   useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const ctx = el.getContext("2d");
-    const DPR = Math.min(2, window.devicePixelRatio || 1);
-
-    const w = el.clientWidth;
-    const h = el.clientHeight;
-    el.width  = Math.floor(w * DPR);
-    el.height = Math.floor(h * DPR);
-    ctx.scale(DPR, DPR);
-
-    ctx.clearRect(0,0,w,h);
-
-    const data = (candles.length > sub) ? candles.slice(-sub) : candles;
-    if (!data?.length) return;
-
-    // y scale
-    let lo = +Infinity, hi = -Infinity;
-    for (let i=0;i<data.length;i++){
-      const v = mode === "line" ? data[i].c : data[i].h;
-      const l = mode === "line" ? data[i].c : data[i].l;
-      if (v > hi) hi = v;
-      if (l < lo) lo = l;
-    }
-    if (!isFinite(lo) || !isFinite(hi) || lo === hi) { lo -= 1; hi += 1; }
-    const px = (v) => h - ((v - lo) / (hi - lo)) * (h - 12) - 6;
-
-    // grid (subtle)
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i=1;i<5;i++){
-      const y = (h/5)*i;
-      ctx.moveTo(0, y); ctx.lineTo(w, y);
-    }
-    ctx.stroke();
-
-    const xstep = w / Math.max(1, data.length - 1);
-
-    if (mode === "line"){
-      ctx.strokeStyle = "#f2c94c";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i=0;i<data.length;i++){
-        const x = i * xstep;
-        const y = px(data[i].c);
-        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const data = await fetchCryptoCandles(pair, tf, 400, ctrl.signal);
+        setCandles(data);
+        setLast(data[data.length-1]?.c ?? 0);
+      } catch (e) {
+        // fallback last price only (chart will wait for WS)
+        try { setLast(await fetchCoinbasePrice(pair, ctrl.signal)); } catch {}
       }
-      ctx.stroke();
-    } else {
-      // minimal candles
-      const bw = Math.max(1, xstep * 0.6);
-      for (let i=0;i<data.length;i++){
-        const x = i * xstep;
-        const d = data[i];
-        // wick
-        ctx.strokeStyle = "rgba(255,255,255,0.4)";
-        ctx.beginPath();
-        ctx.moveTo(x, px(d.h)); ctx.lineTo(x, px(d.l)); ctx.stroke();
-        // body
-        const up = d.c >= d.o;
-        ctx.fillStyle = up ? "rgba(24,194,124,0.8)" : "rgba(223,63,63,0.8)";
-        const y1 = px(d.o), y2 = px(d.c);
-        const top = Math.min(y1,y2), ht = Math.max(2, Math.abs(y1-y2));
-        ctx.fillRect(x - bw/2, top, bw, ht);
-      }
-    }
+    })();
+    return () => ctrl.abort();
+  }, [pair, tf]);
 
-    // last price tag
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(w-92, 6, 86, 20);
-    ctx.fillStyle = "#f2c94c";
-    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
-    ctx.textAlign = "right";
-    ctx.fillText((lastPrice||0).toLocaleString(undefined,{maximumFractionDigits:2}), w-8, 20);
+  // live WS stream
+  useEffect(() => {
+    let close = openCryptoWS({
+      pair, tf,
+      onTick: (p) => setLast(p),
+      onCandle: (k) => {
+        setCandles(prev => {
+          if (!prev?.length) return [k];
+          const lastIdx = prev.length - 1;
+          // replace or append if new interval
+          if (k.t === prev[lastIdx].t) {
+            const next = prev.slice();
+            next[lastIdx] = k;
+            return next;
+          } else if (k.t > prev[lastIdx].t) {
+            return [...prev.slice(-399), k];
+          } else {
+            return prev;
+          }
+        });
+      },
+      onClose: () => {/* silent retry handled inside */}
+    });
+    return () => close && close();
+  }, [pair, tf]);
 
-  }, [candles, mode, scrubPct, lastPrice]);
+  // derived slice for the slider window
+  const view = useMemo(() => {
+    const n = Math.max(10, Math.floor(candles.length * Math.max(0.05, pct)));
+    return candles.slice(-n);
+  }, [candles, pct]);
 
-  function onScrub(e){
-    setIsScrubbing(true);
-    const v = Number(e.target.value);
-    setScrubPct(v/100);
-  }
-  function endScrub(){ setIsScrubbing(false); }
+  // simple SVG render for line (keeps bundle light)
+  const linePath = useMemo(() => {
+    if (view.length < 2) return "";
+    const w = 900, h = 360, pad = 8;
+    const xs = (i) => pad + (i * (w - pad*2)) / (view.length - 1);
+    const ys = (v) => {
+      const lo = Math.min(...view.map(k => k.l ?? k.c));
+      const hi = Math.max(...view.map(k => k.h ?? k.c));
+      const t = (v - lo) / Math.max(1e-9, (hi - lo));
+      return pad + (1 - t) * (h - pad*2);
+    };
+    return "M " + view.map((k,i)=>`${xs(i)},${ys(k.c)}`).join(" L ");
+  }, [view]);
 
   return (
     <section className="focus-shell">
-      <div className="focus-card single-border">
-        <header className="focus-head">
-          <div className="row">
-            <select value={pair} onChange={e=>setPair(e.target.value)} className="select">
-              {PAIRS.map(p => <option key={p}>{p}</option>)}
-            </select>
-            <select value={tf} onChange={e=>setTf(e.target.value)} className="select">
-              {TFS.map(t => <option key={t}>{t}</option>)}
-            </select>
-            <div className="toggle-group">
-              <button onClick={()=>setMode("candle")} className={mode==="candle"?"pill on":"pill"}>Candle</button>
-              <button onClick={()=>setMode("line")}   className={mode==="line"  ?"pill on":"pill"}>Line</button>
-            </div>
+      <div className="focus-card fov-card">
+        <div className="focus-head">
+          <select value={pair} onChange={e=>setPair(e.target.value)} className="btn">
+            <option>BTC/USD</option>
+            <option>ETH/USD</option>
+            <option>XRP/USD</option>
+            <option>SOL/USD</option>
+          </select>
+          <select value={tf} onChange={e=>setTf(e.target.value)} className="btn">
+            {TFS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <div className="seg">
+            <button className={mode==="candle"?"on":""} onClick={()=>setMode("candle")}>Candle</button>
+            <button className={mode==="line"  ?"on":""} onClick={()=>setMode("line")}>Line</button>
           </div>
-        </header>
+          <label className="kr">
+            <input type="checkbox" disabled />
+            <span>KnightRider picks</span>
+          </label>
+        </div>
 
         <div className="canvas-wrap">
-          <canvas ref={canvasRef} style={{width:"100%",height:"320px",display:"block"}} />
+          {mode === "line" ? (
+            <svg viewBox="0 0 900 360" preserveAspectRatio="none" className="chart">
+              <path d={linePath} vectorEffect="non-scaling-stroke" fill="none" strokeWidth="2"/>
+            </svg>
+          ) : (
+            <div className="loading">Candle view coming (line is live)</div>
+          )}
+          <div className="go-live">● Live</div>
         </div>
 
         <div className="scrub-row">
-          <input type="range" min="5" max="100" step="1"
-            value={Math.round(scrubPct*100)}
-            onChange={onScrub}
-            onMouseUp={endScrub} onTouchEnd={endScrub}
-            aria-label="History range" />
-          <span className="scrub-label">{Math.round(scrubPct*100)}% of history</span>
+          <input type="range" min="0.05" max="1" step="0.01" value={pct}
+                 onChange={e=>setPct(Number(e.target.value))}/>
+          <span className="scrub-label">{Math.round(pct*100)}% of history</span>
         </div>
 
-        <div className="stats">
-          <div className="last">Last: <strong>{(lastPrice||0).toLocaleString(undefined,{maximumFractionDigits:2})}</strong></div>
+        <div className="cta-row">
+          <div className="last">Last:&nbsp;<strong>{last ? last.toLocaleString() : "…"}</strong></div>
+          <div className="ctas">
+            <button className="buy">Buy</button>
+            <button className="sell">Sell</button>
+            <button className="trade">Trade</button>
+          </div>
         </div>
       </div>
     </section>
