@@ -1,134 +1,178 @@
-import knightPick from "../lib/knight";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAdaptivePoll } from "../lib/useAdaptivePoll";
+import knightPick from "../lib/knight";
 
-const ALL = ["BTC/USD","ETH/USD","XRP/USD","BNB/USD","SOL/USD","ADA/USD","DOGE/USD","AVAX/USD","LINK/USD","TON/USD"];
-const KNIGHT_PICKS = ["BTC/USD","ETH/USD","LINK/USD"];
 const FUNCS = import.meta.env.VITE_FUNCS || "/.netlify/functions";
+const PAIRS = ["BTC/USD","ETH/USD","XRP/USD","SOL/USD","LINK/USD","ADA/USD","AVAX/USD","DOGE/USD","TON/USD","BNB/USD"];
+const TFS   = ["1m","5m","1h","1d"];
 
-function useResize(ref){
-  const [s,setS]=useState({w:0,h:0});
-  useEffect(()=>{ if(!ref.current) return; const ro=new ResizeObserver(e=>{const r=e[0].contentRect; setS({w:Math.round(r.width),h:Math.round(r.height)});}); ro.observe(ref.current); return ()=>ro.disconnect();},[ref]);
-  return s;
+function canvasHiDPI(canvas){
+  const r = window.devicePixelRatio || 1;
+  const { width, height } = canvas.getBoundingClientRect();
+  canvas.width  = Math.max(1, Math.floor(width  * r));
+  canvas.height = Math.max(1, Math.floor(height * r));
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(r,0,0,r,0,0);
+  return ctx;
+}
+
+function drawCandle(ctx, x, w, o, h, l, c, y){
+  const green = c >= o;
+  // wick
+  ctx.strokeStyle = "rgba(200,200,200,.6)";
+  ctx.beginPath();
+  ctx.moveTo(x + w/2, y(h));
+  ctx.lineTo(x + w/2, y(l));
+  ctx.stroke();
+  // body
+  ctx.fillStyle = green ? "rgba(38,201,144,.9)" : "rgba(212,66,87,.9)";
+  const top = Math.min(y(o), y(c));
+  const bot = Math.max(y(o), y(c));
+  ctx.fillRect(x+1, top, Math.max(1,w-2), Math.max(1, bot-top));
+}
+
+function drawLine(ctx, points, y){
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,216,64,.9)";
+  ctx.beginPath();
+  points.forEach((p,i) => {
+    const xx = p.x, yy = y(p.c);
+    if (i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
+  });
+  ctx.stroke();
 }
 
 export default function CoinFocus(){
   const [pair, setPair] = useState("BTC/USD");
   const [tf, setTf] = useState("1m");
-  const [usePicks, setUsePicks] = useState(false);
+  const [mode, setMode] = useState("candle"); // 'candle' | 'line'
+  const [useKR, setUseKR] = useState(false);
 
   const [candles, setCandles] = useState([]);
-  const [lastPrice, setLastPrice] = useState(null);
-  const [status, setStatus] = useState(null);
+  const [lastPrice, setLastPrice] = useState(0);
+  const [pct, setPct] = useState(1);
   const [isPaused, setPaused] = useState(false);
-  const [rangePct, setRangePct] = useState(100);
 
-  // populate dropdown with live symbols (best-effort)
-  const [symbols, setSymbols] = useState(ALL);
-  useEffect(()=>{(async()=>{
-    try{
-      const r = await fetch(`${FUNCS}/ticker`, {cache:"no-store"});
-      if(!r.ok) return;
-      const j = await r.json();
-      const list = j.map(x=>String(x.symbol).replace("_","/")).filter(Boolean);
-      if(list.length) setSymbols(Array.from(new Set(list)).sort());
-    }catch(_){}
-  })();},[]);
+  // KnightRider
+  useEffect(() => { if (useKR) setPair(knightPick().replace("_","/")); }, [useKR]);
 
-  useAdaptivePoll({ pair, tf, limit: 600, setCandles, setLastPrice, setStatus, isPaused });
+  // Poller (Coinbase function already installed)
+  useAdaptivePoll({ pair, tf, limit: 600, setCandles, setLastPrice, isPaused });
 
-  const view = useMemo(()=>{
-    if(!candles.length) return [];
-    const n = candles.length;
-    const take = Math.max(20, Math.floor(rangePct/100 * n));
-    return candles.slice(n - take);
-  },[candles, rangePct]);
+  // Refs
+  const ref = useRef(null);
 
-  const wrapRef = useRef(null);
-  const canvasRef = useRef(null);
-  const size = useResize(wrapRef);
+  // Draw
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ctx = canvasHiDPI(el);
+    const { width, height } = el.getBoundingClientRect();
 
-  useEffect(()=>{
-    const cvs=canvasRef.current, el=wrapRef.current;
-    if(!cvs || !el || !view.length) return;
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
-    const W = Math.max(10, size.w), H = Math.max(10, size.h);
-    cvs.width=Math.floor(W*dpr); cvs.height=Math.floor(H*dpr); cvs.style.width=W+"px"; cvs.style.height=H+"px";
-    const g=cvs.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+    // bg
+    ctx.clearRect(0,0,width,height);
+    const g = ctx.createLinearGradient(0,0,0,height);
+    g.addColorStop(0,"rgba(0,0,0,.00)");
+    g.addColorStop(1,"rgba(0,0,0,.35)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,width,height);
 
-    const padL=8,padR=8,padT=8,padB=18, innerW=W-padL-padR, innerH=H-padT-padB;
-    let lo=Infinity, hi=-Infinity; for(const k of view){ if(k.l<lo) lo=k.l; if(k.h>hi) hi=k.h; }
-    if(!isFinite(lo)||!isFinite(hi)||lo===hi){ lo=0; hi=1; }
-    const x=i=>padL+(i/(view.length-1))*innerW;
-    const y=p=>padT+(1-(p-lo)/(hi-lo))*innerH;
+    const slice = Math.max(10, Math.floor(candles.length * pct));
+    const data = candles.slice(-slice);
+    if (data.length < 2) return;
 
-    // grid
-    g.globalAlpha=.25; g.strokeStyle="rgba(212,175,55,.18)"; g.beginPath();
-    for(let i=0;i<6;i++){ const yy=padT+(i/5)*innerH; g.moveTo(padL,yy); g.lineTo(W-padR,yy); }
-    g.stroke(); g.globalAlpha=1;
+    const min = Math.min(...data.map(d => d.l));
+    const max = Math.max(...data.map(d => d.h));
+    const pad = (max - min) * 0.08;
+    const yMin = min - pad, yMax = max + pad;
 
-    const barW = Math.max(1, innerW/Math.max(10,view.length)*0.7);
-    for(let i=0;i<view.length;i++){
-      const k=view[i], cx=x(i);
-      g.strokeStyle="rgba(212,175,55,.6)"; g.beginPath(); g.moveTo(cx,y(k.h)); g.lineTo(cx,y(k.l)); g.stroke();
-      const up=k.c>=k.o; g.fillStyle=up?"rgba(212,175,55,.85)":"rgba(164,22,26,.85)";
-      const top=y(Math.max(k.o,k.c)), bot=y(Math.min(k.o,k.c)), h=Math.max(1,bot-top);
-      g.fillRect(cx-barW/2, top, barW, h);
+    const left = 8, right = width - 8;
+    const top = 8, bottom = height - 8;
+    const w = right - left, h = bottom - top;
+
+    const xw = w / data.length;
+    const y = v => bottom - ( (v - yMin) / (yMax - yMin) ) * h;
+
+    if (mode === "candle"){
+      data.forEach((d,i) => {
+        const x = left + i * xw;
+        drawCandle(ctx, x, Math.max(2, xw*0.75), d.o, d.h, d.l, d.c, y);
+      });
+    } else {
+      const pts = data.map((d,i) => ({ x: left + i*xw, c: d.c }));
+      drawLine(ctx, pts, y);
     }
 
-    const last=view[view.length-1].c, yy=y(last);
-    g.strokeStyle="rgba(24,194,124,.9)"; g.setLineDash([6,6]); g.beginPath(); g.moveTo(padL,yy); g.lineTo(W-padR,yy); g.stroke(); g.setLineDash([]);
-    g.fillStyle="rgba(16,16,16,.95)"; const lbl=`${pair} ${last}`; const tw=g.measureText(lbl).width+10;
-    g.fillRect(W-padR-tw, yy-10, tw, 18); g.fillStyle="#18c27c"; g.fillText(lbl, W-padR-tw+5, yy+3);
-  },[view, size.w, size.h, pair]);
+    // last price
+    ctx.fillStyle = "rgba(255,216,64,.95)";
+    ctx.font = "600 13px ui-sans-serif, system-ui, -apple-system";
+    ctx.fillText((lastPrice||0).toLocaleString(), left+6, top+16);
+  }, [candles, pct, mode, lastPrice]);
+
+  const portfolioSymbol = useMemo(() => pair, [pair]);
 
   return (
     <section className="focus-shell">
-      <div className="focus-card">
+      <div className="focus-card fov-card">
         <div className="focus-head">
-          <div className="focus-title">
-            <div className="focus-label">FOCUS</div>
-            <div className="focus-pair">{pair}</div>
-          </div>
-          <div className="focus-controls">
-            <select value={pair} onChange={e=>{setPair(e.target.value); setPaused(false);}}>
-              {(usePicks?KNIGHT_PICKS:symbols).map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-            <select value={tf} onChange={e=>setTf(e.target.value)}>
-              <option value="1m">1m</option><option value="5m">5m</option>
-              <option value="1h">1h</option><option value="1d">1d</option>
-            </select>
-            <label className="toggle">
-              <input type="checkbox" checked={usePicks} onChange={e=>setUsePicks(e.target.checked)} />
-              <span>KnightRider picks</span>
-            </label>
-          </div>
+          <div className="focus-kicker">FOCUS</div>
+          <h2 className="focus-title">{pair}</h2>
         </div>
 
-        <div className="canvas-wrap" ref={wrapRef}>
-          <canvas ref={canvasRef}/>
-          <div className="loading"><span className={`live-dot ${!isPaused?'on':''}`}/>{isPaused?'Paused':'Live'}</div>
-          {status && <div className="status">{status}</div>}
-          {!isPaused
-            ? <button className="go-live" onClick={()=>setPaused(true)}>Pause</button>
-            : <button className="go-live" onClick={()=>setPaused(false)}>Resume</button>}
+        <div className="focus-controls">
+          <div className="row">
+            <div className="select">
+              <select value={pair} onChange={e=>setPair(e.target.value)}>
+                {PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="select">
+              <select value={tf} onChange={e=>setTf(e.target.value)}>
+                {TFS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div className="switch-row">
+              <input id="kr" type="checkbox" checked={useKR} onChange={e=>setUseKR(e.target.checked)} />
+              <label htmlFor="kr">KnightRider picks</label>
+            </div>
+
+            <div className="mode-row">
+              <button
+                className={`btn tiny ${mode==="candle"?"on":""}`}
+                onClick={()=>setMode("candle")}
+                aria-pressed={mode==="candle"}
+              >Candle</button>
+              <button
+                className={`btn tiny ${mode==="line"?"on":""}`}
+                onClick={()=>setMode("line")}
+                aria-pressed={mode==="line"}
+              >Line</button>
+            </div>
+          </div>
+          <hr className="soft" />
         </div>
 
-        <div className="scrub-row"
-          onMouseDown={()=>setPaused(true)} onTouchStart={()=>setPaused(true)}
-          onMouseUp={()=>setPaused(false)} onTouchEnd={()=>setPaused(false)}
-        >
-          <input type="range" min="5" max="100" value={rangePct}
-            onChange={e=>setRangePct(parseInt(e.target.value,10))}/>
-          <div className="scrub-label">{rangePct}% of history</div>
+        <div className="canvas-wrap" onPointerDown={()=>setPaused(true)} onPointerUp={()=>setPaused(false)} onPointerCancel={()=>setPaused(false)}>
+          <canvas ref={ref} style={{width:"100%",height:"320px", display:"block"}} />
+          <div className="live-dot on" aria-live="polite">Live</div>
+        </div>
+
+        <div className="scrub-row">
+          <input type="range" min="0.1" max="1" step="0.01" value={pct} onChange={e=>setPct(parseFloat(e.target.value))} />
+          <span className="scrub-label">{Math.round(pct*100)}% of history</span>
         </div>
 
         <div className="cta-row">
-          <button className="cta buy">Buy</button>
-          <button className="cta sell">Sell</button>
-          <button className="cta trade">Trade</button>
+          <button className="btn buy">Buy</button>
+          <button className="btn sell">Sell</button>
+          <button className="btn trade">Trade</button>
         </div>
+
+        <PortfolioBar symbol={portfolioSymbol} price={lastPrice} />
       </div>
     </section>
   );
 }
+
+import PortfolioBar from "./PortfolioBar.jsx";

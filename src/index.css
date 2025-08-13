@@ -776,3 +776,69 @@ body::before{
 /* FoV focus chart – extras */
 .focus-controls .toggle{ margin-left:6px; }
 .canvas-wrap .status{ position:absolute; left:10px; bottom:10px; font-size:12px; color:#bbb; }
+
+/* FoV focus chart v3 */
+.focus-shell{ padding: 10px 14px; }
+.focus-card{
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(255,206,64,.06), transparent 60%),
+    radial-gradient(140% 110% at 100% 0%, rgba(64,200,255,.04), transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.35));
+  border: 1px solid rgba(255,214,64,.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  overflow: hidden;
+}
+.focus-head{ padding: 12px 14px 0; }
+.focus-kicker{ color:#e3b94b; font-size:12px; letter-spacing:.12em; }
+.focus-title{ color:#f5d872; margin:0; }
+
+.focus-controls{ padding: 4px 12px 0; }
+.focus-controls .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.select select{
+  appearance:none; background:#121212; color:#eee; border:1px solid #333;
+  border-radius:12px; padding:10px 12px; font-weight:600;
+}
+.switch-row{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+.switch-row input{ width:18px; height:18px; accent-color:#e3b94b; }
+.switch-row label{ color:#ddd; font-size:14px; user-select:none; }
+.mode-row{ display:flex; gap:8px; }
+.btn.tiny{ padding:6px 10px; border-radius:10px; background:#141414; border:1px solid #2a2a2a; color:#ddd; }
+.btn.tiny.on{ border-color:#e3b94b; color:#ffe08a; }
+
+.soft{ border:0; height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); margin:8px 0 6px; }
+
+.canvas-wrap{ position:relative; height:320px; overflow:hidden; }
+.live-dot{ position:absolute; right:10px; bottom:10px; color:#bbb; }
+.live-dot.on::before{ content:"• "; color:#18c27c; font-weight:900; }
+
+.scrub-row{ display:flex; align-items:center; gap:12px; padding:8px 12px; }
+.scrub-row input[type="range"]{ width:100%; }
+.scrub-label{ color:#a8a8a8; font-size:12px; }
+
+.cta-row{ display:flex; gap:12px; padding:0 12px 12px; }
+.btn.buy{ background:linear-gradient(180deg,#29c57e,#0c6b49); color:#fff; border-radius:14px; padding:12px 16px; }
+.btn.sell{ background:linear-gradient(180deg,#c33,#6a1a1a); color:#fff; border-radius:14px; padding:12px 16px; }
+.btn.trade{ background:linear-gradient(180deg,#e3b94b,#8a6d14); color:#1a1a1a; font-weight:800; border-radius:14px; padding:12px 16px; }
+
+.fov-portfolio{
+  border-top:1px solid rgba(255,255,255,.06);
+  margin-top:6px; padding:10px 12px 14px;
+  background:linear-gradient(180deg, transparent, rgba(0,0,0,.18));
+}
+.port-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.port-title{ color:#e9c35b; font-weight:700; }
+.port-sub{ color:#9aa; font-size:12px; }
+.port-stats{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.port-stats > div{ background:#101010; border:1px solid #222; border-radius:10px; padding:6px 8px; color:#ddd; }
+.port-stats .muted{ color:#9aa; margin-right:4px; }
+.port-pnl.up{ color:#2dd19a; }
+.port-pnl.down{ color:#ff7a7a; }
+.port-quick{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+.btn.mini{ padding:5px 10px; border-radius:10px; background:#131313; border:1px solid #2a2a2a; color:#ddd; }
+.tip{ font-size:12px; color:#8f8f8f; }
+
+@media (max-width:480px){
+  .canvas-wrap{ height:300px; }
+  .focus-controls .row{ gap:8px; }
+}
