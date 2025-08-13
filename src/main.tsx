@@ -1,3 +1,4 @@
+import ProdErrorBoundary from "./components/ProdErrorBoundary";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -11,7 +12,7 @@ createRoot(root).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <BrowserRouter><BrowserRouter><App/></BrowserRouter></BrowserRouter>
+        <BrowserRouter><BrowserRouter><ProdErrorBoundary><App/></ProdErrorBoundary></BrowserRouter></BrowserRouter>
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>

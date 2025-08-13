@@ -1,3 +1,4 @@
+import { SafeRender } from "../lib/safeRender";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   openCryptoWS,
@@ -119,7 +120,7 @@ export default function CoinFocus(){
         </div>
 
         <div className="cta-row">
-          <div className="last">Last:&nbsp;<strong>{last ? last.toLocaleString() : "…"}</strong></div>
+          <div className="last">Last:&nbsp;<strong><SafeRender value={last ? last.toLocaleString() : "…"} /></strong></div>
           <div className="ctas">
             <button className="buy">Buy</button>
             <button className="sell">Sell</button>
