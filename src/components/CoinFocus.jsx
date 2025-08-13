@@ -5,7 +5,8 @@ import knightPick from "../lib/knight";
 import PortfolioBar from "./PortfolioBar.jsx";
 
 const PAIRS = ["BTC/USD","ETH/USD","XRP/USD","SOL/USD","LINK/USD","ADA/USD","AVAX/USD","DOGE/USD","TON/USD","BNB/USD"];
-const TFS   = ["1m","5m","1h","1d"];
+// New timeframe presets
+const TFS   = ["1m","3m","5m","30m","1h","24h"];
 
 function canvasHiDPI(canvas){
   const r = window.devicePixelRatio || 1;
@@ -37,38 +38,36 @@ function drawLine(ctx, points, y){
 export default function CoinFocus(){
   const [pair, setPair] = useState("BTC/USD");
   const [tf, setTf] = useState("1m");
-  const [mode, setMode] = useState("line");   // default to line to show live dot
+  const [mode, setMode] = useState("line");
   const [useKR, setUseKR] = useState(false);
 
   const [candles, setCandles] = useState([]);
   const [lastPrice, setLastPrice] = useState(0);
-  const [livePrice, setLivePrice] = useState(null); // moves between candles
+  const [livePrice, setLivePrice] = useState(null);
   const [pct, setPct] = useState(1);
   const [isPaused, setPaused] = useState(false);
 
   // KnightRider suggestion
   useEffect(() => { if (useKR) setPair(knightPick().replace("_","/")); }, [useKR]);
 
-  // Candle poller (600 history points for scrubber)
+  // Poll historical candles for the chosen tf
   useAdaptivePoll({ pair, tf, limit: 600, setCandles, setLastPrice, isPaused });
 
-  // Fast live price (updates ~1s) — only when in line mode for now
-  useLivePrice({ pair, onPrice: setLivePrice, isPaused: isPaused || mode !== "line" });
+  // Live dot that respects the selected tf (fallbacks if /price missing)
+  useLivePrice({ pair, tf, onPrice: setLivePrice, isPaused: isPaused || mode !== "line" });
 
   const ref = useRef(null);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const el = ref.current; if (!el) return;
     const ctx = canvasHiDPI(el);
     const { width, height } = el.getBoundingClientRect();
 
-    // background
     ctx.clearRect(0,0,width,height);
-    const g = ctx.createLinearGradient(0,0,0,height);
-    g.addColorStop(0,"rgba(0,0,0,.00)");
-    g.addColorStop(1,"rgba(0,0,0,.35)");
-    ctx.fillStyle = g; ctx.fillRect(0,0,width,height);
+    const bg = ctx.createLinearGradient(0,0,0,height);
+    bg.addColorStop(0,"rgba(0,0,0,.00)");
+    bg.addColorStop(1,"rgba(0,0,0,.35)");
+    ctx.fillStyle = bg; ctx.fillRect(0,0,width,height);
 
     const slice = Math.max(10, Math.floor(candles.length * pct));
     const data = candles.slice(-slice);
@@ -86,39 +85,35 @@ export default function CoinFocus(){
 
     if (mode === "candle"){
       data.forEach((d,i) => drawCandle(ctx, left + i*xw, Math.max(2, xw*0.75), d.o, d.h, d.l, d.c, y));
-    } else {
+    }else{
       const pts = data.map((d,i) => ({ x: left + i*xw, c: d.c }));
       drawLine(ctx, pts, y);
 
-      // --- LIVE PRICE DOT + dashed guide ---
+      // Live price marker
       const lp = (typeof livePrice === "number" ? livePrice : lastPrice);
       if (lp){
-        const lastX = left + (data.length-1)*xw;
         const guideY = y(lp);
-
         // dashed guide
         ctx.setLineDash([6,6]);
         ctx.strokeStyle = "rgba(255,255,255,.18)";
         ctx.beginPath(); ctx.moveTo(left, guideY); ctx.lineTo(right, guideY); ctx.stroke();
         ctx.setLineDash([]);
 
-        // blinking dot
+        // dot
         ctx.fillStyle = "rgba(255,216,64,.95)";
         ctx.beginPath(); ctx.arc(right-10, guideY, 4, 0, Math.PI*2); ctx.fill();
 
-        // price tag
+        // tag
         ctx.fillStyle = "rgba(26,26,26,.9)";
         ctx.strokeStyle = "rgba(255,216,64,.35)";
         ctx.lineWidth = 1;
         const label = (lp).toLocaleString();
-        const padX = 6, padY = 3;
+        const padX = 6;
         ctx.font = "600 12px ui-sans-serif, system-ui, -apple-system";
         const tw = ctx.measureText(label).width;
         const bx = right - (tw + padX*2 + 20), by = guideY - 11, bw = tw + padX*2, bh = 18;
-        ctx.fillRect(bx, by, bw, bh);
-        ctx.strokeRect(bx, by, bw, bh);
-        ctx.fillStyle = "#ffe08a";
-        ctx.fillText(label, bx + padX, by + 13);
+        ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = "#ffe08a"; ctx.fillText(label, bx + padX, by + 13);
       }
     }
   }, [candles, pct, mode, lastPrice, livePrice]);
@@ -140,6 +135,7 @@ export default function CoinFocus(){
                 {PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
+
             <div className="select">
               <select value={tf} onChange={e=>setTf(e.target.value)}>
                 {TFS.map(t => <option key={t} value={t}>{t}</option>)}
