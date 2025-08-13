@@ -2,9 +2,8 @@ import { useEffect, useRef } from "react";
 
 /**
  * Live last-price for a pair/timeframe.
- * - Tries GET /price?symbol=PAIR
- * - If that 404/451/5xx, falls back to GET /candles?symbol=PAIR&tf=TF&limit=1
- * - Polls ~1s when healthy, backs off up to 60s on errors
+ * Tries Netlify /.netlify/functions/price first (fast),
+ * falls back to /candles?limit=1 if unavailable.
  */
 export default function useLivePrice({ pair, tf="1m", onPrice, isPaused=false }) {
   const alive = useRef(true), t = useRef(null), ms = useRef(1000), ctrl = useRef(null);
@@ -18,58 +17,47 @@ export default function useLivePrice({ pair, tf="1m", onPrice, isPaused=false })
     try { ctrl.current?.abort(); } catch {}
     ctrl.current = new AbortController();
 
-    let price = null, ok = false, usedFallback = false;
+    let price = null, ok = false, fallback = false;
 
-    // Try /price first
+    // 1) fast path: /price
     try{
       const r = await fetch(`${FUNCS}/price?symbol=${encodeURIComponent(pair)}`, { signal: ctrl.current.signal, cache:"no-store" });
       if (r.ok){
         const j = await r.json();
         price = typeof j === "number" ? j : (j?.price ?? null);
-        ok = typeof price === "number";
+        ok = Number.isFinite(price);
       }
     }catch{}
 
-    // Fallback: /candles?limit=1
+    // 2) fallback: last candle
     if (!ok){
-      usedFallback = true;
+      fallback = true;
       try{
         const r = await fetch(`${FUNCS}/candles?symbol=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}&limit=1`, { signal: ctrl.current.signal, cache:"no-store" });
         if (r.ok){
-          const arr = await r.json(); // [{t,o,h,l,c,v}] or []
+          const arr = await r.json();
           price = Array.isArray(arr) && arr[0] ? (arr[0].c ?? null) : null;
-          ok = typeof price === "number";
+          ok = Number.isFinite(price);
         }
       }catch{}
     }
 
     if (ok){
       onPrice?.(price);
-      // stay fast when healthy, slightly slower if fallback path (to be polite)
-      ms.current = usedFallback ? 1500 : 1000;
+      ms.current = fallback ? 1500 : 1000;   // polite backoff if on fallback
     }else{
-      // backoff on error
-      if (ms.current < 5000) ms.current = 5000;
-      else if (ms.current < 10000) ms.current = 10000;
-      else if (ms.current < 30000) ms.current = 30000;
-      else ms.current = 60000;
-      console.warn?.("[livePrice] backoff →", ms.current,"ms");
+      // progressive backoff
+      ms.current = ms.current < 5000 ? 5000 : ms.current < 10000 ? 10000 : ms.current < 30000 ? 30000 : 60000;
+      console.warn("[live] backoff", ms.current);
     }
     schedule(ms.current);
   }
 
   useEffect(() => {
-    alive.current = true;
-    ms.current = 1000; // reset fast when inputs change
-    tick();
+    alive.current = true; ms.current = 1000; tick();
     const onFocus = () => { ms.current = 1000; tick(); };
     window.addEventListener("focus", onFocus);
-    return () => {
-      alive.current = false;
-      clearTimeout(t.current);
-      try { ctrl.current?.abort(); } catch {}
-      window.removeEventListener("focus", onFocus);
-    };
+    return () => { alive.current=false; clearTimeout(t.current); try{ctrl.current?.abort();}catch{} window.removeEventListener("focus", onFocus); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pair, tf, isPaused]);
 }
