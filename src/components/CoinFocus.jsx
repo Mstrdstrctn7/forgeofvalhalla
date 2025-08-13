@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAdaptivePoll } from "../lib/useAdaptivePoll";
+import useLivePrice from "../lib/useLivePrice";
 import knightPick from "../lib/knight";
+import PortfolioBar from "./PortfolioBar.jsx";
 
-const FUNCS = import.meta.env.VITE_FUNCS || "/.netlify/functions";
 const PAIRS = ["BTC/USD","ETH/USD","XRP/USD","SOL/USD","LINK/USD","ADA/USD","AVAX/USD","DOGE/USD","TON/USD","BNB/USD"];
 const TFS   = ["1m","5m","1h","1d"];
 
@@ -18,16 +19,10 @@ function canvasHiDPI(canvas){
 
 function drawCandle(ctx, x, w, o, h, l, c, y){
   const green = c >= o;
-  // wick
   ctx.strokeStyle = "rgba(200,200,200,.6)";
-  ctx.beginPath();
-  ctx.moveTo(x + w/2, y(h));
-  ctx.lineTo(x + w/2, y(l));
-  ctx.stroke();
-  // body
+  ctx.beginPath(); ctx.moveTo(x + w/2, y(h)); ctx.lineTo(x + w/2, y(l)); ctx.stroke();
   ctx.fillStyle = green ? "rgba(38,201,144,.9)" : "rgba(212,66,87,.9)";
-  const top = Math.min(y(o), y(c));
-  const bot = Math.max(y(o), y(c));
+  const top = Math.min(y(o), y(c)), bot = Math.max(y(o), y(c));
   ctx.fillRect(x+1, top, Math.max(1,w-2), Math.max(1, bot-top));
 }
 
@@ -35,47 +30,45 @@ function drawLine(ctx, points, y){
   ctx.lineWidth = 2;
   ctx.strokeStyle = "rgba(255,216,64,.9)";
   ctx.beginPath();
-  points.forEach((p,i) => {
-    const xx = p.x, yy = y(p.c);
-    if (i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
-  });
+  points.forEach((p,i) => { const yy = y(p.c); if (i===0) ctx.moveTo(p.x,yy); else ctx.lineTo(p.x,yy); });
   ctx.stroke();
 }
 
 export default function CoinFocus(){
   const [pair, setPair] = useState("BTC/USD");
   const [tf, setTf] = useState("1m");
-  const [mode, setMode] = useState("candle"); // 'candle' | 'line'
+  const [mode, setMode] = useState("line");   // default to line to show live dot
   const [useKR, setUseKR] = useState(false);
 
   const [candles, setCandles] = useState([]);
   const [lastPrice, setLastPrice] = useState(0);
+  const [livePrice, setLivePrice] = useState(null); // moves between candles
   const [pct, setPct] = useState(1);
   const [isPaused, setPaused] = useState(false);
 
-  // KnightRider
+  // KnightRider suggestion
   useEffect(() => { if (useKR) setPair(knightPick().replace("_","/")); }, [useKR]);
 
-  // Poller (Coinbase function already installed)
+  // Candle poller (600 history points for scrubber)
   useAdaptivePoll({ pair, tf, limit: 600, setCandles, setLastPrice, isPaused });
 
-  // Refs
+  // Fast live price (updates ~1s) — only when in line mode for now
+  useLivePrice({ pair, onPrice: setLivePrice, isPaused: isPaused || mode !== "line" });
+
   const ref = useRef(null);
 
-  // Draw
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const ctx = canvasHiDPI(el);
     const { width, height } = el.getBoundingClientRect();
 
-    // bg
+    // background
     ctx.clearRect(0,0,width,height);
     const g = ctx.createLinearGradient(0,0,0,height);
     g.addColorStop(0,"rgba(0,0,0,.00)");
     g.addColorStop(1,"rgba(0,0,0,.35)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0,0,width,height);
+    ctx.fillStyle = g; ctx.fillRect(0,0,width,height);
 
     const slice = Math.max(10, Math.floor(candles.length * pct));
     const data = candles.slice(-slice);
@@ -86,28 +79,49 @@ export default function CoinFocus(){
     const pad = (max - min) * 0.08;
     const yMin = min - pad, yMax = max + pad;
 
-    const left = 8, right = width - 8;
-    const top = 8, bottom = height - 8;
+    const left = 8, right = width - 8, top = 8, bottom = height - 8;
     const w = right - left, h = bottom - top;
-
     const xw = w / data.length;
-    const y = v => bottom - ( (v - yMin) / (yMax - yMin) ) * h;
+    const y = v => bottom - ((v - yMin) / (yMax - yMin)) * h;
 
     if (mode === "candle"){
-      data.forEach((d,i) => {
-        const x = left + i * xw;
-        drawCandle(ctx, x, Math.max(2, xw*0.75), d.o, d.h, d.l, d.c, y);
-      });
+      data.forEach((d,i) => drawCandle(ctx, left + i*xw, Math.max(2, xw*0.75), d.o, d.h, d.l, d.c, y));
     } else {
       const pts = data.map((d,i) => ({ x: left + i*xw, c: d.c }));
       drawLine(ctx, pts, y);
-    }
 
-    // last price
-    ctx.fillStyle = "rgba(255,216,64,.95)";
-    ctx.font = "600 13px ui-sans-serif, system-ui, -apple-system";
-    ctx.fillText((lastPrice||0).toLocaleString(), left+6, top+16);
-  }, [candles, pct, mode, lastPrice]);
+      // --- LIVE PRICE DOT + dashed guide ---
+      const lp = (typeof livePrice === "number" ? livePrice : lastPrice);
+      if (lp){
+        const lastX = left + (data.length-1)*xw;
+        const guideY = y(lp);
+
+        // dashed guide
+        ctx.setLineDash([6,6]);
+        ctx.strokeStyle = "rgba(255,255,255,.18)";
+        ctx.beginPath(); ctx.moveTo(left, guideY); ctx.lineTo(right, guideY); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // blinking dot
+        ctx.fillStyle = "rgba(255,216,64,.95)";
+        ctx.beginPath(); ctx.arc(right-10, guideY, 4, 0, Math.PI*2); ctx.fill();
+
+        // price tag
+        ctx.fillStyle = "rgba(26,26,26,.9)";
+        ctx.strokeStyle = "rgba(255,216,64,.35)";
+        ctx.lineWidth = 1;
+        const label = (lp).toLocaleString();
+        const padX = 6, padY = 3;
+        ctx.font = "600 12px ui-sans-serif, system-ui, -apple-system";
+        const tw = ctx.measureText(label).width;
+        const bx = right - (tw + padX*2 + 20), by = guideY - 11, bw = tw + padX*2, bh = 18;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = "#ffe08a";
+        ctx.fillText(label, bx + padX, by + 13);
+      }
+    }
+  }, [candles, pct, mode, lastPrice, livePrice]);
 
   const portfolioSymbol = useMemo(() => pair, [pair]);
 
@@ -138,22 +152,17 @@ export default function CoinFocus(){
             </div>
 
             <div className="mode-row">
-              <button
-                className={`btn tiny ${mode==="candle"?"on":""}`}
-                onClick={()=>setMode("candle")}
-                aria-pressed={mode==="candle"}
-              >Candle</button>
-              <button
-                className={`btn tiny ${mode==="line"?"on":""}`}
-                onClick={()=>setMode("line")}
-                aria-pressed={mode==="line"}
-              >Line</button>
+              <button className={`btn tiny ${mode==="candle"?"on":""}`} onClick={()=>setMode("candle")} aria-pressed={mode==="candle"}>Candle</button>
+              <button className={`btn tiny ${mode==="line"?"on":""}`} onClick={()=>setMode("line")} aria-pressed={mode==="line"}>Line</button>
             </div>
           </div>
           <hr className="soft" />
         </div>
 
-        <div className="canvas-wrap" onPointerDown={()=>setPaused(true)} onPointerUp={()=>setPaused(false)} onPointerCancel={()=>setPaused(false)}>
+        <div className="canvas-wrap"
+             onPointerDown={()=>setPaused(true)}
+             onPointerUp={()=>setPaused(false)}
+             onPointerCancel={()=>setPaused(false)}>
           <canvas ref={ref} style={{width:"100%",height:"320px", display:"block"}} />
           <div className="live-dot on" aria-live="polite">Live</div>
         </div>
@@ -169,10 +178,8 @@ export default function CoinFocus(){
           <button className="btn trade">Trade</button>
         </div>
 
-        <PortfolioBar symbol={portfolioSymbol} price={lastPrice} />
+        <PortfolioBar symbol={portfolioSymbol} price={Number(livePrice ?? lastPrice) || 0} />
       </div>
     </section>
   );
 }
-
-import PortfolioBar from "./PortfolioBar.jsx";

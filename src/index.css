@@ -842,3 +842,5 @@ body::before{
   .canvas-wrap{ height:300px; }
   .focus-controls .row{ gap:8px; }
 }
+/* FoV live label */
+.canvas-wrap canvas{ display:block; width:100%; height:100%; }
