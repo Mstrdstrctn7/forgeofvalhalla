@@ -117,7 +117,6 @@ export default function Debug(){
       </div>
 
       <div style={{marginTop:20, opacity:.8}}>
-        Tip: Only one <code>&lt;BrowserRouter&gt;</code> in the app (usually in <code>main.tsx</code>).
       </div>
     </div>
   );

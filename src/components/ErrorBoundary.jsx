@@ -14,8 +14,8 @@ export default class ErrorBoundary extends React.Component {
           <pre style={{whiteSpace:"pre-wrap",fontSize:12,opacity:.9,marginTop:8}}>{info.componentStack.trim()}</pre>
         )}
         <div style={{marginTop:8,display:"flex",gap:8}}>
-          <button onClick={()=>this.setState({open:!open})} style="padding:6px 10px">Toggle stack</button>
-          <button onClick={this.handleReset} style="padding:6px 10px">Reload</button>
+          <button onClick={()=>this.setState({open:!open})} style={{ padding:"6px 10px" }}>Toggle stack</button>
+          <button onClick={this.handleReset} style={{ padding:"6px 10px" }}>Reload</button>
         </div>
       </div>
     );
