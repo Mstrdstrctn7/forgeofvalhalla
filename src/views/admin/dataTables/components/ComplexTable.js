@@ -38,6 +38,7 @@ function HeaderText({ label }) {
     >
       {label}
     </Text>
+  </>
   );
 }
 
