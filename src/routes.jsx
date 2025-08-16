@@ -1,16 +1,13 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import AdminLayout from "./layouts/admin/index.jsx";
-import AuthLayout from "./layouts/auth/index.jsx";
+import AdminLayout from "layouts/admin/index.jsx";
+import AuthLayout from "layouts/auth/index.jsx";
+import RTLLayout from "layouts/rtl/index.jsx";
 
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/auth/*" element={<AuthLayout />} />
-      <Route path="/*" element={<AdminLayout />} />
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
-  );
-};
+const routes = [
+  { path: "/admin", element: <AdminLayout /> },
+  { path: "/auth",  element: <AuthLayout /> },
+  { path: "/rtl",   element: <RTLLayout /> },
+  { path: "/",      element: <AdminLayout /> },
+];
 
-export default AppRoutes;
+export default routes;
