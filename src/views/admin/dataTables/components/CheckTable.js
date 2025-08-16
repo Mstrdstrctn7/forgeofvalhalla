@@ -33,14 +33,13 @@ function HeaderText({ label }) {
     <Text
       justifyContent="space-between"
       align="center"
-      fontSize={{ sm: '10px', lg: '12px' }}
+      fontSize={{ sm: "10px", lg: "12px" }}
       color="gray.400"
     >
       {label}
     </Text>
   );
 }
-
 export default function CheckTable(props) {
   const { tableData } = props;
   const [sorting, setSorting] = React.useState([]);
@@ -140,3 +139,4 @@ export default function CheckTable(props) {
     </Card>
   );
 }
+
