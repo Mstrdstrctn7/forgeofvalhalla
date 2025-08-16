@@ -16,7 +16,7 @@ export default defineConfig({
       assets: path.resolve(__dirname, "src/assets"),
       layouts: path.resolve(__dirname, "src/layouts"),
       views: path.resolve(__dirname, "src/views"),
-      routes: path.resolve(__dirname, "src/routes.js"), // ← ✅ Add this line
+      routes: path.resolve(__dirname, "src/routes.jsx"), // ← ✅ Add this line
     },
   },
 });
