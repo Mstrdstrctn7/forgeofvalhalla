@@ -12,7 +12,7 @@ import Profile from "views/admin/profile";
 import DataTables from "views/admin/dataTables";
 import NFTMarketplace from "views/admin/nftMarketplace";
 import Settings from "views/admin/settings";
-import ChakraExample from "views/admin/chakra";
+import ChakraExample from "views/admin/chakra.jsx";
 import RTLPage from "views/rtl";
 
 // ✅ Correct route import (ONLY ONCE)
