@@ -18,7 +18,7 @@ import ChakraExample from "views/admin/chakra";
 import RTLPage from "views/rtl";
 
 // Assets
-import routes from "../../routes.js";
+import routes from "routes.js";
 import { Box, Flex } from "@chakra-ui/react";
 
 export default function AdminLayout() {
