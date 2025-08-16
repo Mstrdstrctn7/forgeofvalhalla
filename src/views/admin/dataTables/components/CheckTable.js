@@ -169,7 +169,10 @@ export default function CheckTable(props) {
                         fontSize={{ sm: '10px', lg: '12px' }}
                         color="gray.400"
                       >
-                        {flexRender(
+                      Project NAME
+                    </Text>
+                  ),
+                    {flexRender(
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
