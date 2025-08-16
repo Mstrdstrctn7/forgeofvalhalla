@@ -1,69 +1,78 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "utils/supabaseClient";
+import { supabase } from "../../utils/supabaseClient";
 import {
   Box,
-  Heading,
   Text,
-  VStack,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
   Spinner,
-  Badge,
 } from "@chakra-ui/react";
 
 export default function Logs() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchLogs = async () => {
-    const { data, error } = await supabase
-      .from("paper_trades")
-      .select("*")
-      .order("timestamp", { ascending: false });
-
-    if (error) console.error("Fetch error:", error);
-    else setLogs(data);
-
-    setLoading(false);
-  };
-
   useEffect(() => {
+    const fetchLogs = async () => {
+      const { data, error } = await supabase
+        .from("paper_trades")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error("Error fetching logs:", error.message);
+      } else {
+        setLogs(data);
+      }
+
+      setLoading(false);
+    };
+
     fetchLogs();
-
-    const channel = supabase
-      .channel("trade_logs")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "paper_trades" },
-        (payload) => {
-          setLogs((prevLogs) => [payload.new, ...prevLogs]);
-        }
-      )
-      .subscribe();
-
-    return () => supabase.removeChannel(channel);
   }, []);
 
   return (
-    <Box p="4">
-      <Heading size="lg" mb="4">📜 Trade Logs</Heading>
+    <Box p={6}>
+      <Text fontSize="2xl" fontWeight="bold" mb={4}>
+        KnightRider Trade Logs
+      </Text>
+
       {loading ? (
-        <Spinner />
+        <Spinner size="xl" />
+      ) : logs.length === 0 ? (
+        <Text>No trades found.</Text>
       ) : (
-        <VStack align="start" spacing="4">
-          {logs.map((log) => (
-            <Box key={log.id} p="4" borderWidth="1px" rounded="lg" w="100%">
-              <Text><b>🪙 Coin:</b> {log.symbol}</Text>
-              <Text><b>📈 Action:</b> {log.side}</Text>
-              <Text><b>💰 Amount:</b> {log.amount}</Text>
-              <Text><b>📅 Time:</b> {new Date(log.timestamp).toLocaleString()}</Text>
-              <Badge colorScheme={log.mode === "paper" ? "purple" : "green"}>
-                {log.mode === "paper" ? "Paper" : "Live"}
-              </Badge>
-            </Box>
-          ))}
-          {logs.length === 0 && (
-            <Text>No trades yet. Use the Trade Panel to begin.</Text>
-          )}
-        </VStack>
+        <Table variant="striped" size="sm">
+          <Thead>
+            <Tr>
+              <Th>Time</Th>
+              <Th>Email</Th>
+              <Th>Coin</Th>
+              <Th>Side</Th>
+              <Th>Qty</Th>
+              <Th>Price</Th>
+              <Th>Result</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {logs.map((log) => (
+              <Tr key={log.id}>
+                <Td>{new Date(log.timestamp).toLocaleString()}</Td>
+                <Td>{log.user_email}</Td>
+                <Td>{log.coin}</Td>
+                <Td>{log.side}</Td>
+                <Td>{log.quantity}</Td>
+                <Td>${log.price}</Td>
+                <Td>{log.result}</Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
       )}
     </Box>
   );
