@@ -1,79 +1,64 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../utils/supabaseClient";
-import {
-  Box,
-  Text,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Spinner,
-} from "@chakra-ui/react";
 
 export default function Logs() {
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const { data, error } = await supabase
-        .from("paper_trades")
-        .select("*")
-        .order("timestamp", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error("Error fetching logs:", error.message);
-      } else {
-        setLogs(data);
-      }
-
-      setLoading(false);
+      const { data, error } = await supabase.from("paper_trades").select("*").order("created_at", { ascending: true });
+      if (!error) setLogs(data);
     };
-
     fetchLogs();
   }, []);
 
-  return (
-    <Box p={6}>
-      <Text fontSize="2xl" fontWeight="bold" mb={4}>
-        KnightRider Trade Logs
-      </Text>
+  const calculateResults = (logs) => {
+    let avgBuy = 0;
+    let totalQty = 0;
+    return logs.map((log) => {
+      let result = "";
+      const qty = parseFloat(log.qty);
+      const price = parseFloat(log.price);
 
-      {loading ? (
-        <Spinner size="xl" />
-      ) : logs.length === 0 ? (
-        <Text>No trades found.</Text>
-      ) : (
-        <Table variant="striped" size="sm">
-          <Thead>
-            <Tr>
-              <Th>Time</Th>
-              <Th>Email</Th>
-              <Th>Coin</Th>
-              <Th>Side</Th>
-              <Th>Qty</Th>
-              <Th>Price</Th>
-              <Th>Result</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {logs.map((log) => (
-              <Tr key={log.id}>
-                <Td>{new Date(log.timestamp).toLocaleString()}</Td>
-                <Td>{log.user_email}</Td>
-                <Td>{log.coin}</Td>
-                <Td>{log.side}</Td>
-                <Td>{log.quantity}</Td>
-                <Td>${log.price}</Td>
-                <Td>{log.result}</Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Table>
-      )}
-    </Box>
+      if (log.side === "BUY") {
+        avgBuy = (avgBuy * totalQty + price * qty) / (totalQty + qty);
+        totalQty += qty;
+      } else if (log.side === "SELL") {
+        result = ((price - avgBuy) * qty).toFixed(2);
+        totalQty -= qty;
+      }
+
+      return { ...log, result };
+    });
+  };
+
+  const logsWithResults = calculateResults(logs);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">📜 Trade Logs</h1>
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="border-b">
+            <th>COIN</th>
+            <th>SIDE</th>
+            <th>QTY</th>
+            <th>PRICE</th>
+            <th>RESULT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logsWithResults.map((log) => (
+            <tr key={log.id} className="border-b">
+              <td>{log.coin}</td>
+              <td>{log.side}</td>
+              <td>{log.qty}</td>
+              <td>${parseFloat(log.price).toFixed(2)}</td>
+              <td>{log.result ? `$${log.result}` : "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
