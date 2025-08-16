@@ -1,13 +1,32 @@
+// src/views/admin/Logs.jsx
 import React, { useEffect, useState } from "react";
+import {
+  Box,
+  Heading,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Text,
+  Spinner,
+  Center,
+} from "@chakra-ui/react";
 import { supabase } from "../../utils/supabaseClient";
 
 export default function Logs() {
   const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const { data, error } = await supabase.from("paper_trades").select("*").order("created_at", { ascending: true });
+      const { data, error } = await supabase
+        .from("paper_trades")
+        .select("*")
+        .order("created_at", { ascending: true });
       if (!error) setLogs(data);
+      setLoading(false);
     };
     fetchLogs();
   }, []);
@@ -35,30 +54,43 @@ export default function Logs() {
   const logsWithResults = calculateResults(logs);
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">📜 Trade Logs</h1>
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th>COIN</th>
-            <th>SIDE</th>
-            <th>QTY</th>
-            <th>PRICE</th>
-            <th>RESULT</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logsWithResults.map((log) => (
-            <tr key={log.id} className="border-b">
-              <td>{log.coin}</td>
-              <td>{log.side}</td>
-              <td>{log.qty}</td>
-              <td>${parseFloat(log.price).toFixed(2)}</td>
-              <td>{log.result ? `$${log.result}` : "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Box p={6}>
+      <Heading size="lg" mb={4}>
+        📜 Trade Logs
+      </Heading>
+
+      {loading ? (
+        <Center py={10}>
+          <Spinner size="xl" />
+        </Center>
+      ) : logs.length === 0 ? (
+        <Text>No trades found.</Text>
+      ) : (
+        <Box overflowX="auto">
+          <Table variant="simple">
+            <Thead>
+              <Tr>
+                <Th>COIN</Th>
+                <Th>SIDE</Th>
+                <Th>QTY</Th>
+                <Th>PRICE</Th>
+                <Th>RESULT</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {logsWithResults.map((log) => (
+                <Tr key={log.id}>
+                  <Td>{log.coin}</Td>
+                  <Td>{log.side}</Td>
+                  <Td>{log.qty}</Td>
+                  <Td>${parseFloat(log.price).toFixed(2)}</Td>
+                  <Td>{log.result ? `$${log.result}` : "-"}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </Box>
+      )}
+    </Box>
   );
 }
