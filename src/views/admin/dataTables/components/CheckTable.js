@@ -28,6 +28,19 @@ import * as React from 'react';
 
 const columnHelper = createColumnHelper();
 
+function HeaderText({ label }) {
+  return (
+    <Text
+      justifyContent="space-between"
+      align="center"
+      fontSize={{ sm: '10px', lg: '12px' }}
+      color="gray.400"
+    >
+      {label}
+    </Text>
+  );
+}
+
 export default function CheckTable(props) {
   const { tableData } = props;
   const [sorting, setSorting] = React.useState([]);
@@ -39,16 +52,7 @@ export default function CheckTable(props) {
   const columns = [
     columnHelper.accessor('name', {
       id: 'name',
-      header: () => (
-        <Text
-          justifyContent="space-between"
-          align="center"
-          fontSize={{ sm: '10px', lg: '12px' }}
-          color="gray.400"
-        >
-          PROJECT
-        </Text>
-      ),
+      header: () => <HeaderText label="PROJECT" />,
       cell: (info) => (
         <Flex align="center">
           <Text color={textColor} fontSize="sm" fontWeight="700">
@@ -59,16 +63,7 @@ export default function CheckTable(props) {
     }),
     columnHelper.accessor('progress', {
       id: 'progress',
-      header: () => (
-        <Text
-          justifyContent="space-between"
-          align="center"
-          fontSize={{ sm: '10px', lg: '12px' }}
-          color="gray.400"
-        >
-          STATUS
-        </Text>
-      ),
+      header: () => <HeaderText label="STATUS" />,
       cell: (info) => (
         <Text color={textColor} fontSize="sm" fontWeight="700">
           {info.getValue()}
