@@ -4,9 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Forge of Valhalla</title>
+
+    <!-- Debug overlay: shows runtime errors & boot logs on screen -->
+    <script>
+      (function () {
+        var box = document.createElement('div');
+        box.id = 'bootlog';
+        box.style.cssText =
+          'position:fixed;left:8px;bottom:8px;right:8px;max-height:45vh;' +
+          'overflow:auto;z-index:99999;font:12px/1.4 monospace;' +
+          'background:rgba(0,0,0,0.8);color:#0f0;padding:8px;border-radius:8px;';
+        box.textContent = '[boot] index.html loaded';
+        document.addEventListener('DOMContentLoaded', function () {
+          box.textContent += '\n[boot] DOMContentLoaded';
+        });
+        function log(msg) { box.textContent += '\n' + msg; }
+        window.__bootlog = log;
+
+        window.addEventListener('error', function (e) {
+          box.style.color = '#fff';
+          box.style.background = 'rgba(128,0,0,0.9)';
+          log('[error] ' + e.message + ' @ ' + (e.filename||'') + ':' + (e.lineno||''));
+          if (e.error && e.error.stack) log(String(e.error.stack));
+        });
+
+        window.addEventListener('unhandledrejection', function (e) {
+          box.style.color = '#fff';
+          box.style.background = 'rgba(128,0,0,0.9)';
+          log('[unhandledrejection] ' + String(e.reason));
+          if (e.reason && e.reason.stack) log(String(e.reason.stack));
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+          document.body.appendChild(box);
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Vite injects the bundle path during build -->
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
