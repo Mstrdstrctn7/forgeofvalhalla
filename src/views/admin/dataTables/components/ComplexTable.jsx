@@ -1,9 +1,10 @@
 'use client';
 /* eslint-disable */
-
+import React from 'react';
 import {
   Box,
   Flex,
+  Progress,
   Table,
   Tbody,
   Td,
@@ -13,7 +14,6 @@ import {
   Tr,
   useColorModeValue,
 } from '@chakra-ui/react';
-
 import {
   createColumnHelper,
   flexRender,
@@ -21,10 +21,9 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-
 import Card from 'components/card/Card';
 import Menu from 'components/menu/MainMenu';
-import * as React from 'react';
+import { AndroidLogo, AppleLogo, WindowsLogo } from 'components/icons/Icons';
 
 const columnHelper = createColumnHelper();
 
@@ -38,83 +37,111 @@ function HeaderText({ label }) {
     >
       {label}
     </Text>
-  </>
   );
 }
 
 export default function ComplexTable(props) {
-  const { tableData } = props;
+  const { tableData = [] } = props;
   const [sorting, setSorting] = React.useState([]);
   const textColor = useColorModeValue('secondaryGray.900', 'white');
+  const iconColor = useColorModeValue('secondaryGray.500', 'white');
   const borderColor = useColorModeValue('gray.200', 'whiteAlpha.100');
 
-  let defaultData = tableData;
+  const data = React.useMemo(() => [...tableData], [tableData]);
 
-  const columns = [
-    columnHelper.accessor('name', {
-      id: 'name',
-      header: () => <HeaderText label="NAME" />,
-      cell: (info) => (
-        <Flex align="center">
+  const columns = React.useMemo(
+    () => [
+      columnHelper.accessor('name', {
+        id: 'name',
+        header: () => <HeaderText label="PROJECT" />,
+        cell: (info) => (
+          <Flex align="center">
+            <Text color={textColor} fontSize="sm" fontWeight="700">
+              {info.getValue()}
+            </Text>
+          </Flex>
+        ),
+      }),
+      columnHelper.accessor('tech', {
+        id: 'tech',
+        header: () => <HeaderText label="STATUS" />,
+        cell: (info) => (
+          <Flex align="center">
+            {(info.getValue() || []).map((item, key) => {
+              if (item === 'apple') {
+                return (
+                  <AppleLogo key={key} color={iconColor} me="16px" h="18px" w="15px" />
+                );
+              } else if (item === 'android') {
+                return (
+                  <AndroidLogo key={key} color={iconColor} me="16px" h="18px" w="16px" />
+                );
+              } else if (item === 'windows') {
+                return <WindowsLogo key={key} color={iconColor} h="18px" w="19px" />;
+              }
+              return null;
+            })}
+          </Flex>
+        ),
+      }),
+      columnHelper.accessor('date', {
+        id: 'date',
+        header: () => <HeaderText label="DATE" />,
+        cell: (info) => (
           <Text color={textColor} fontSize="sm" fontWeight="700">
             {info.getValue()}
           </Text>
-        </Flex>
-      ),
-    }),
-    columnHelper.accessor('status', {
-      id: 'status',
-      header: () => <HeaderText label="STATUS" />,
-      cell: (info) => (
-        <Text color={textColor} fontSize="sm" fontWeight="700">
-          {info.getValue()}
-        </Text>
-      ),
-    }),
-  ];
-
-  const [data, setData] = React.useState(() => [...defaultData]);
+        ),
+      }),
+      columnHelper.accessor('progress', {
+        id: 'progress',
+        header: () => <HeaderText label="PROGRESS" />,
+        cell: (info) => (
+          <Flex align="center">
+            <Text me="10px" color={textColor} fontSize="sm" fontWeight="700">
+              {info.getValue()}%
+            </Text>
+            <Progress
+              variant="table"
+              colorScheme="brandScheme"
+              h="8px"
+              w="63px"
+              value={info.getValue() || 0}
+            />
+          </Flex>
+        ),
+      }),
+    ],
+    [textColor, iconColor]
+  );
 
   const table = useReactTable({
     data,
     columns,
-    state: {
-      sorting,
-    },
+    state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
 
   return (
-    <Card extra="w-full h-full px-6 pb-6 sm:overflow-x-auto">
-      <Flex px="25px" justify="space-between" mb="20px" align="center">
-        <Text
-          color={textColor}
-          fontSize="22px"
-          fontWeight="700"
-          lineHeight="100%"
-        >
-          Complex Table
+    <Card direction="column" w="100%" px="0px" overflowX={{ sm: 'scroll', lg: 'hidden' }}>
+      <Flex px="25px" mb="8px" justify="space-between" align="center">
+        <Text color={textColor} fontSize="22px" fontWeight="700" lineHeight="100%">
+          Development Table
         </Text>
         <Menu />
       </Flex>
-      <Box overflow={{ sm: 'scroll', lg: 'hidden' }}>
-        <Table variant="simple" color="gray.500" mb="24px" mt="12px">
+      <Box>
+        <Table variant="simple" color="gray.500">
           <Thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <Tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <Th
-                    key={header.id}
-                    colSpan={header.colSpan}
-                    pe="10px"
-                    borderColor={borderColor}
-                  >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
+                  <Th key={header.id} colSpan={header.colSpan} borderColor={borderColor}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
                   </Th>
                 ))}
               </Tr>
@@ -128,7 +155,7 @@ export default function ComplexTable(props) {
                     key={cell.id}
                     fontSize={{ sm: '14px' }}
                     minW={{ sm: '150px', md: '200px', lg: 'auto' }}
-                    borderColor="transparent"
+                    borderColor={borderColor}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </Td>
