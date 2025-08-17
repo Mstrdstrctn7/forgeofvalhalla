@@ -12,45 +12,44 @@ import {
   Thead,
   Tr,
   useColorModeValue,
-} from '@chakra-ui/react';
-
+} from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
-
-import Card from 'components/card/Card';
-import Menu from 'components/menu/MainMenu';
-import * as React from 'react';
+} from "@tanstack/react-table";
+import Card from "components/card/Card";
+import Menu from "components/menu/MainMenu";
+import * as React from "react";
 
 const columnHelper = createColumnHelper();
 
 function HeaderText({ label }) {
-  return (
-    <Text
-      justifyContent="space-between"
-      align="center"
-      fontSize={{ sm: "10px", lg: "12px" }}
-      color="gray.400"
-    >
-      {label}
-    </Text>
+  return React.createElement(
+    Text,
+    {
+      justifyContent: "space-between",
+      align: "center",
+      fontSize: { sm: "10px", lg: "12px" },
+      color: "gray.400",
+    },
+    label
   );
 }
+
 export default function CheckTable(props) {
   const { tableData } = props;
   const [sorting, setSorting] = React.useState([]);
-  const textColor = useColorModeValue('secondaryGray.900', 'white');
-  const borderColor = useColorModeValue('gray.200', 'whiteAlpha.100');
+  const textColor = useColorModeValue("secondaryGray.900", "white");
+  const borderColor = useColorModeValue("gray.200", "whiteAlpha.100");
 
   let defaultData = tableData;
 
   const columns = [
-    columnHelper.accessor('name', {
-      id: 'name',
+    columnHelper.accessor("name", {
+      id: "name",
       header: () => <HeaderText label="PROJECT" />,
       cell: (info) => (
         <Flex align="center">
@@ -60,8 +59,8 @@ export default function CheckTable(props) {
         </Flex>
       ),
     }),
-    columnHelper.accessor('progress', {
-      id: 'progress',
+    columnHelper.accessor("progress", {
+      id: "progress",
       header: () => <HeaderText label="STATUS" />,
       cell: (info) => (
         <Text color={textColor} fontSize="sm" fontWeight="700">
@@ -97,7 +96,7 @@ export default function CheckTable(props) {
         </Text>
         <Menu />
       </Flex>
-      <Box overflow={{ sm: 'scroll', lg: 'hidden' }}>
+      <Box overflow={{ sm: "scroll", lg: "hidden" }}>
         <Table variant="simple" color="gray.500" mb="24px" mt="12px">
           <Thead>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -124,11 +123,14 @@ export default function CheckTable(props) {
                 {row.getVisibleCells().map((cell) => (
                   <Td
                     key={cell.id}
-                    fontSize={{ sm: '14px' }}
-                    minW={{ sm: '150px', md: '200px', lg: 'auto' }}
+                    fontSize={{ sm: "14px" }}
+                    minW={{ sm: "150px", md: "200px", lg: "auto" }}
                     borderColor="transparent"
                   >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    {flexRender(
+                      cell.column.columnDef.cell,
+                      cell.getContext()
+                    )}
                   </Td>
                 ))}
               </Tr>
@@ -139,4 +141,3 @@ export default function CheckTable(props) {
     </Card>
   );
 }
-
